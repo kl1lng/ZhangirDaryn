@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DosYm Motion Avatar</title>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <style>
+    :root{--blue:#0071e3;--ink:#1d1d1f;--muted:#6e6e73}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;padding:24px;font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:linear-gradient(145deg,#f5f5f7,#e7edf5);display:grid;place-items:center}
+    .stage{width:min(800px,100%);padding:28px;background:rgba(255,255,255,.78);border:1px solid #fff;border-radius:28px;box-shadow:0 20px 60px #27384a1f;backdrop-filter:blur(24px)}
+    header{display:flex;justify-content:space-between;align-items:start;margin-bottom:16px}h1{font-size:clamp(24px,4vw,38px);letter-spacing:-.05em;margin:0}.subtitle{color:var(--muted);margin:8px 0 0}.live{color:var(--blue);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+    #scene{height:350px;border-radius:22px;overflow:hidden;background:radial-gradient(circle at 50% 30%,#fff,#dbe8f6);border:1px solid #fff;position:relative}canvas{display:block;width:100%;height:100%}.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:30px;pointer-events:none}.empty[hidden]{display:none}
+    .controls{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}.controls button{border:1px solid #d2d2d7;background:#fff;color:var(--ink);border-radius:999px;padding:11px 16px;cursor:pointer;font-weight:600}.controls button.primary{background:var(--blue);border-color:var(--blue);color:#fff}.controls button:hover{transform:translateY(-1px)}.caption{margin-top:16px;background:#f5f5f7;border:1px solid #d2d2d7;border-radius:14px;padding:14px 16px;color:var(--muted)}
+  </style>
+</head>
+<body>
+<main class="stage">
+  <header><div><h1>DosYm Motion Avatar</h1><p class="subtitle">Покадровое воспроизведение видео движений рук</p></div><span class="live">● Motion</span></header>
+  <section id="scene"><canvas id="canvas"></canvas><div id="empty" class="empty">Нет клипа для введённой фразы.<br>Добавьте видео жеста в motion-библиотеку.</div></section>
+  <div class="controls"><button class="primary" onclick="playMotion()">▶ Воспроизвести</button><button onclick="startVoice()">● Сказать фразу</button><button onclick="toggle()">Ⅱ Пауза</button><button onclick="resetView()">↺ Сбросить вид</button></div>
+  <div id="caption" class="caption">Ожидание клипа.</div>
+</main>
+<script>
+let activeSequence=__MOTION_SEQUENCE__;
+let activeLabel=__MOTION_LABEL__;
+let activeFps=__MOTION_FPS__;
+let activeImageAspectRatio=normalizeImageAspectRatio(/*IMAGE_ASPECT_RATIO__*/1);
+let activeBodyPose=/*BODY_POSE__*/null;
+let activeLanguage=/*MOTION_LANGUAGE__*/"kk-KZ";
+let initialQueue=/*MOTION_QUEUE__*/[];
+let initialMissing=/*MOTION_MISSING__*/[];
+const THREE_SCENE=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(36,1,.01,100);camera.position.set(0,-.18,3.55);camera.lookAt(0,-.18,0);
+const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('#canvas'),antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+THREE_SCENE.add(new THREE.HemisphereLight(0xffffff,0x879bb0,2.1));
+const keyLight=new THREE.DirectionalLight(0xffffff,1.6);keyLight.position.set(-1,2,3);THREE_SCENE.add(keyLight);
+const actor=new THREE.Group();THREE_SCENE.add(actor);
+const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.30,.73,8,20),new THREE.MeshStandardMaterial({color:0x25334a,roughness:.62}));torso.position.set(0,-.48,-.13);actor.add(torso);
+const neck=new THREE.Mesh(new THREE.CylinderGeometry(.09,.11,.24,20),new THREE.MeshStandardMaterial({color:0xe6ad88,roughness:.72}));neck.position.set(0,.32,-.13);actor.add(neck);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.225,32,24),new THREE.MeshStandardMaterial({color:0xe6ad88,roughness:.72}));head.scale.set(.88,1.13,.82);head.position.set(0,.58,-.13);actor.add(head);
+const face=new THREE.Group();face.position.set(0,.58,.065);actor.add(face);
+const eyeMat=new THREE.MeshBasicMaterial({color:0x30231f});
+for(const x of [-.075,.075]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.014,10,8),eyeMat);eye.position.set(x,.012,0);face.add(eye)}
+const staticMouthCurve=new THREE.QuadraticBezierCurve3(new THREE.Vector3(-.055,-.055,.006),new THREE.Vector3(0,-.09,.01),new THREE.Vector3(.055,-.055,.006));
+const staticMouth=new THREE.Mesh(new THREE.TubeGeometry(staticMouthCurve,12,.006,6,false),new THREE.MeshBasicMaterial({color:0x704e43}));face.add(staticMouth);
+const liveMouthGeometry=new THREE.BufferGeometry();liveMouthGeometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(39),3));
+const liveMouth=new THREE.Line(liveMouthGeometry,new THREE.LineBasicMaterial({color:0x704e43}));liveMouth.visible=false;face.add(liveMouth);
+const mouthCavity=new THREE.Mesh(new THREE.SphereGeometry(1,20,12),new THREE.MeshBasicMaterial({color:0x342026}));mouthCavity.visible=false;face.add(mouthCavity);
+const browLines=[0,1].map(()=>{const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(9),3));const line=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:0x49352f}));line.visible=false;face.add(line);return line});
+
+// One hand contains a skinned-looking palm plate, 21 joints and 20 tapered phalanges.
+const LINKS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20]];
+const FINGERS=[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]];
+const skin=new THREE.MeshStandardMaterial({color:0xd59a79,roughness:.68,metalness:0,side:THREE.DoubleSide});
+const nailMat=new THREE.MeshStandardMaterial({color:0xf1c9b5,roughness:.4,side:THREE.DoubleSide});
+// Контур ладони: запястье, два основания большого пальца и основания четырёх
+// остальных пальцев. Сглаживаем его между landmark-точками вместо плоского веера.
+const PALM_BOUNDARY=[0,1,2,5,9,13,17],PALM_RIM_SEGMENTS=4;
+const PALM_RIM_POINTS=PALM_BOUNDARY.length*PALM_RIM_SEGMENTS;
+const WEB_PAIRS=[[2,5],[5,9],[9,13],[13,17]];
+const creaseMaterial=new THREE.LineBasicMaterial({color:0x9e6555,transparent:true,opacity:.34});
+function createHand(color){
+  const group=new THREE.Group();actor.add(group);
+  const palmGeometry=new THREE.BufferGeometry();palmGeometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array((PALM_RIM_POINTS+1)*3),3));
+  const triangles=[];for(let i=1;i<=PALM_RIM_POINTS;i++){const next=i%PALM_RIM_POINTS+1;triangles.push(0,i,next)}palmGeometry.setIndex(triangles);
+  const palm=new THREE.Mesh(palmGeometry,skin);group.add(palm);
+  // Округлый объём ладони находится под динамическим контуром, который
+  // повторяет landmarks кадр за кадром.
+  const palmCore=new THREE.Mesh(new THREE.SphereGeometry(1,24,16),skin);group.add(palmCore);
+  const palmPads=[0,1].map(()=>{const pad=new THREE.Mesh(new THREE.SphereGeometry(1,20,14),skin);group.add(pad);return pad});
+  const joints=[];for(let i=0;i<21;i++){
+    const isKnuckle=[1,2,5,6,9,10,13,14,17,18].includes(i);
+    const radius=i===0?.039:(isKnuckle?.030:.023);
+    const joint=new THREE.Mesh(new THREE.SphereGeometry(radius,20,16),skin);group.add(joint);joints.push(joint)
+  }
+  const bones=[];for(const[a,b]of LINKS){const bone=new THREE.Mesh(new THREE.CylinderGeometry(.014,.020,1,12,1),skin);group.add(bone);bones.push({mesh:bone,a,b})}
+  // Thin membranes make the palm read as one hand rather than five detached rods.
+  const webs=WEB_PAIRS.map(()=>{
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(12),3));
+    geometry.setIndex([0,1,2,0,2,3]);
+    const mesh=new THREE.Mesh(geometry,skin);group.add(mesh);return mesh
+  });
+  const creases=[0,1].map(()=>{
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(18),3));
+    const line=new THREE.Line(geometry,creaseMaterial);group.add(line);return line
+  });
+  // Nail plates sit on the dorsal side of the distal phalanges.
+  const nails=[];for(const finger of FINGERS){
+    const tip=finger[3],nail=new THREE.Mesh(new THREE.SphereGeometry(1,16,10),nailMat);
+    group.add(nail);nails.push({mesh:nail,tip})
+  }
+  const wrist=new THREE.Mesh(new THREE.CapsuleGeometry(.047,.16,5,12),skin);group.add(wrist);
+  return{group,palm,palmGeometry,palmCore,palmPads,joints,bones,webs,creases,nails,wrist,color};
+}
+const handL=createHand(0x0071e3),handR=createHand(0xff9500);
+// Real upper-arm and forearm segments are driven only by pose landmarks stored
+// alongside this exact motion clip; no guessed elbow positions are synthesized.
+const armMaterial=new THREE.MeshStandardMaterial({color:0xd59a79,roughness:.68});
+function createLimb(){const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.052,.068,1,16),armMaterial);actor.add(mesh);mesh.visible=false;return mesh}
+const limbs=Array.from({length:4},createLimb);
+function setLimb(mesh,a,b,radius){const delta=b.clone().sub(a),length=delta.length();if(length<.025){mesh.visible=false;return}mesh.visible=true;mesh.position.copy(midpoint(a,b));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());mesh.scale.set(radius/.06,length,radius/.06)}
+function matchPoseWristHands(poseWrists,handWrists){
+  let leftHandIndex=0;
+  if(handWrists[0].visible&&handWrists[1].visible){
+    const direct=Math.hypot(poseWrists[0].x-handWrists[0].x,poseWrists[0].y-handWrists[0].y)+Math.hypot(poseWrists[1].x-handWrists[1].x,poseWrists[1].y-handWrists[1].y);
+    const crossed=Math.hypot(poseWrists[0].x-handWrists[1].x,poseWrists[0].y-handWrists[1].y)+Math.hypot(poseWrists[1].x-handWrists[0].x,poseWrists[1].y-handWrists[0].y);
+    leftHandIndex=crossed<direct?1:0;
+  }else if(handWrists[0].visible){
+    leftHandIndex=Math.hypot(poseWrists[1].x-handWrists[0].x,poseWrists[1].y-handWrists[0].y)<Math.hypot(poseWrists[0].x-handWrists[0].x,poseWrists[0].y-handWrists[0].y)?1:0;
+  }else if(handWrists[1].visible){
+    leftHandIndex=Math.hypot(poseWrists[0].x-handWrists[1].x,poseWrists[0].y-handWrists[1].y)<Math.hypot(poseWrists[1].x-handWrists[1].x,poseWrists[1].y-handWrists[1].y)?0:1;
+  }
+  return[leftHandIndex,1-leftHandIndex];
+}
+function applyBodyPose(index){
+  const frame=activeBodyPose?.[index];
+  if(!Array.isArray(frame)||frame.length!==18){limbs.forEach(limb=>limb.visible=false);return}
+  const point=i=>{const x=Number(frame[i*3]),y=Number(frame[i*3+1]),z=Number(frame[i*3+2]);if(!Number.isFinite(x+y+z)||(!x&&!y&&!z))return null;return new THREE.Vector3((x-motionPlacement.centerX)*motionPlacement.worldPerImageUnit*motionPlacement.imageAspectRatio,motionPlacement.targetY-(y-motionPlacement.centerY)*motionPlacement.worldPerImageUnit,.12-z*.08)};
+  const ls=point(0),rs=point(1),le=point(2),re=point(3);
+  // Tasks handedness labels can be reversed on mirrored source footage. Match
+  // Pose wrists to actual hand wrists per frame instead of assuming label parity.
+  const source=activeSequence[index],handWrists=[0,63].map(offset=>({
+    x:Number(source?.[offset])||0,y:Number(source?.[offset+1])||0,
+    group:offset===0?handL:handR,visible:offset===0?handL.group.visible:handR.group.visible
+  }));
+  const poseWrists=[4,5].map(i=>({x:Number(frame[i*3])||0,y:Number(frame[i*3+1])||0}));
+  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  const [leftHandIndex,rightHandIndex]=matchPoseWristHands(poseWrists,handWrists);
+  // Hand and pose tracks are extracted from the same source frame. Once
+  // matched, the arm endpoint must be the rendered hand's actual wrist (3-D
+  // depth included); an arbitrary 2-D distance cutoff created visible gaps.
+  const wristEnd=(poseIndex,handIndex)=>handWrists[handIndex].visible
+      ?handWrists[handIndex].group.group.position.clone():point(4+poseIndex);
+  const lw=wristEnd(0,leftHandIndex),rw=wristEnd(1,rightHandIndex);
+  if(ls&&le&&lw){setLimb(limbs[0],ls,le,.065);setLimb(limbs[1],le,lw,.047)}else{limbs[0].visible=false;limbs[1].visible=false}
+  if(rs&&re&&rw){setLimb(limbs[2],rs,re,.065);setLimb(limbs[3],re,rw,.047)}else{limbs[2].visible=false;limbs[3].visible=false}
+}
+const boneColors=[0x0071e3,0xff9500];
+function normalizeImageAspectRatio(value){const ratio=Number(value);return THREE.MathUtils.clamp(Number.isFinite(ratio)&&ratio>0?ratio:1,.25,4)}
+// Калибровка положения всего клипа. Масштаб кисти и её координаты должны
+// использовать одну систему: иначе две настоящие кисти из close-up видео
+// оказываются почти в одной точке у аватара.
+let motionPlacement={centerX:.5,centerY:.5,worldPerImageUnit:3,imageAspectRatio:1,targetY:.02};
+function calibrateMotion(sequence){
+  const faceX=[],faceY=[],handLengths=[];
+  for(const frame of sequence){
+    for(const offset of [0,63]){
+      const wristX=Number(frame[offset]),wristY=Number(frame[offset+1]);
+      const middleX=Number(frame[offset+27]),middleY=Number(frame[offset+28]);
+      const length=Math.hypot((middleX-wristX)*activeImageAspectRatio,middleY-wristY);
+      if(Number.isFinite(length)&&length>.025)handLengths.push(length);
+    }
+    // Landmark 0 in the face feature block is the nose. Anchor the entire
+    // source coordinate system to the avatar's face, not the average wrists:
+    // wrists may be below/above the head during a sign, and centering them at
+    // the neck makes pose shoulders float above the head or puts hands there.
+    const noseX=Number(frame[126]),noseY=Number(frame[127]);
+    if(Number.isFinite(noseX+noseY)&&(noseX!==0||noseY!==0)){
+      faceX.push(noseX);faceY.push(noseY)
+    }
+  }
+  const median=values=>{if(!values.length)return .5;const sorted=[...values].sort((a,b)=>a-b);return sorted[Math.floor(sorted.length/2)]};
+  const medianLength=median(handLengths);
+  // Визуальная длина запястье→средний MCP равна ~0.26 единицы аватара.
+  // Ставим разумные пределы для неполных/ошибочных landmarks.
+  const worldPerImageUnit=THREE.MathUtils.clamp(.26/Math.max(medianLength,.025),1.5,7);
+  motionPlacement={centerX:median(faceX),centerY:median(faceY),worldPerImageUnit,imageAspectRatio:activeImageAspectRatio,targetY:.58};
+}
+function midpoint(a,b){return a.clone().add(b).multiplyScalar(.5)}
+function handTracked(frame,offset){
+  const wx=Number(frame[offset])||0,wy=Number(frame[offset+1])||0,wz=Number(frame[offset+2])||0;
+  for(let i=1;i<21;i++){
+    const k=offset+i*3,dx=(Number(frame[k])||0)-wx,dy=(Number(frame[k+1])||0)-wy,dz=(Number(frame[k+2])||0)-wz;
+    if(Math.hypot(dx,dy,dz)>.012)return true
+  }
+  return false
+}
+function interpolateShortHandGaps(sequence,maxGap=3){
+  const frames=sequence.map(frame=>frame.slice());
+  for(const offset of [0,63]){
+    let index=0;
+    while(index<frames.length){
+      if(handTracked(frames[index],offset)){index++;continue}
+      const start=index;while(index<frames.length&&!handTracked(frames[index],offset))index++;
+      const gap=index-start,before=start-1,after=index;
+      if(gap>0&&gap<=maxGap&&before>=0&&after<frames.length&&handTracked(frames[before],offset)&&handTracked(frames[after],offset)){
+        for(let frameIndex=start;frameIndex<after;frameIndex++){
+          const amount=(frameIndex-before)/(after-before);
+          for(let feature=0;feature<63;feature++){
+            const position=offset+feature;
+            frames[frameIndex][position]=Number(frames[before][position])*(1-amount)+Number(frames[after][position])*amount
+          }
+        }
+      }
+    }
+  }
+  return frames
+}
+function appendUntrackedFrames(sequence,count=4){
+  if(!Array.isArray(sequence)||!sequence.length||count<=0)return sequence;
+  const width=sequence[0].length;
+  return sequence.concat(Array.from({length:count},()=>Array(width).fill(0)))
+}
+function applyFacialMotion(frame){
+  const offset=126,facePoints=[];
+  for(let i=0;i<12;i++){const k=offset+i*3;facePoints.push(new THREE.Vector3(Number(frame[k])||0,Number(frame[k+1])||0,Number(frame[k+2])||0))}
+  // A face must be detected in this frame before drawing source-driven lips.
+  // Never turn MediaPipe's all-zero missing-data sentinel into a fake face.
+  if(facePoints.every(point=>point.lengthSq()<1e-12)){
+    staticMouth.visible=true;liveMouth.visible=false;mouthCavity.visible=false;browLines.forEach(line=>line.visible=false);return
+  }
+  const nose=facePoints[0],mouthLeft=facePoints[4],mouthRight=facePoints[5];
+  const mouthWidth=Math.hypot(mouthRight.x-mouthLeft.x,mouthRight.y-mouthLeft.y);
+  if(!Number.isFinite(mouthWidth)||mouthWidth<.008){
+    staticMouth.visible=true;liveMouth.visible=false;mouthCavity.visible=false;browLines.forEach(line=>line.visible=false);return
+  }
+  // Calibrate from the complete face geometry, not the tiny normalized mouth
+  // width alone. This keeps pixel-scale face tracks from being magnified 4.5x.
+  const faceHeight=Math.hypot(facePoints[0].x-facePoints[1].x,facePoints[0].y-facePoints[1].y);
+  const scale=THREE.MathUtils.clamp(.24/Math.max(faceHeight,.025),.75,2.4);
+  const toFace=(point)=>new THREE.Vector3((point.x-nose.x)*scale,-(point.y-nose.y)*scale,(nose.z-point.z)*scale*.18+.009);
+  const mappedNose=toFace(nose);
+  face.position.set(mappedNose.x,.58+mappedNose.y,.065+mappedNose.z);
+  const left=toFace(mouthLeft),right=toFace(mouthRight);
+  const upper=toFace(facePoints[2]),lower=toFace(facePoints[3]);
+  const center=upper.clone().add(lower).multiplyScalar(.5);
+  const curve=new THREE.QuadraticBezierCurve3(left,center,right),samples=curve.getPoints(12),mouthAttr=liveMouth.geometry.attributes.position;
+  samples.forEach((point,index)=>mouthAttr.setXYZ(index,point.x,point.y,point.z+.002));
+  mouthAttr.needsUpdate=true;liveMouth.visible=true;staticMouth.visible=false;
+  const gap=upper.distanceTo(lower),localWidth=left.distanceTo(right);
+  mouthCavity.position.copy(center);mouthCavity.position.z+=.001;
+  mouthCavity.scale.set(localWidth*.43,THREE.MathUtils.clamp(gap*.48,.0025,.027),.0025);
+  mouthCavity.visible=true;
+  [[6,7,8],[9,10,11]].forEach((indices,index)=>{
+    const line=browLines[index],attribute=line.geometry.attributes.position;
+    indices.forEach((pointIndex,pointOffset)=>{const point=toFace(facePoints[pointIndex]);point.y+=.012;attribute.setXYZ(pointOffset,point.x,point.y,point.z+.003)});
+    attribute.needsUpdate=true;line.visible=true
+  })
+}
+function calculateHandPose(frame,offset,placement){
+  const raw=[];for(let i=0;i<21;i++){const k=offset+i*3;raw.push({x:Number(frame[k])||0,y:Number(frame[k+1])||0,z:Number(frame[k+2])||0})}
+  const wrist=raw[0];const detected=raw.some((p,i)=>i>0&&Math.hypot(p.x-wrist.x,p.y-wrist.y,p.z-wrist.z)>.012);
+  if(!detected)return null;
+  const scale=placement.worldPerImageUnit;
+  // Keep the measured 3-D orientation. Canonicalizing every palm to point up
+  // makes different signs look alike and loses palm-facing / foreshortening.
+  // MediaPipe uses image-down Y and camera-negative Z; the avatar uses Y-up,
+  // camera-positive Z. A uniform scale preserves finger proportions.
+  const points=raw.map(p=>{
+    const dx=p.x-wrist.x,dy=p.y-wrist.y;
+    return{x:dx*scale*placement.imageAspectRatio,y:-dy*scale,z:-(p.z-wrist.z)*scale*placement.imageAspectRatio}
+  });
+  const x=(wrist.x-placement.centerX)*placement.worldPerImageUnit*placement.imageAspectRatio;
+  const y=placement.targetY-(wrist.y-placement.centerY)*placement.worldPerImageUnit;
+  return{points,groupPosition:[x,y,.34-wrist.z*scale]}
+}
+function applyHand(frame,offset,rig,side){
+  const pose=calculateHandPose(frame,offset,motionPlacement);
+  // Короткие провалы трекера не должны резко прятать кисть из финального кадра.
+  if(!pose){rig.group.visible=false;return}rig.group.visible=true;
+  // All 21 measured points drive this anatomical hand directly, including
+  // out-of-plane rotation. Do not independently stretch palm width/length:
+  // that changes the actual sign shape captured in the source video.
+  const points=pose.points.map(p=>new THREE.Vector3(p.x,p.y,p.z));
+  const palmLong=points[9].clone().sub(points[0]).normalize();
+  const palmAcross=points[17].clone().sub(points[5]).normalize();
+  const palmNormal=palmAcross.clone().cross(palmLong).normalize();
+  if(palmNormal.lengthSq()<1e-6)palmNormal.set(0,0,1);
+  const palmOrientation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),palmNormal);
+  const raised=(point,distance)=>point.clone().addScaledVector(palmNormal,distance);
+  points.forEach((p,i)=>rig.joints[i].position.copy(p));
+  const center=new THREE.Vector3();for(const i of PALM_BOUNDARY)center.add(points[i]);center.multiplyScalar(1/PALM_BOUNDARY.length);
+  const positions=rig.palmGeometry.attributes.position;const palmCenter=raised(center,.015);positions.setXYZ(0,palmCenter.x,palmCenter.y,palmCenter.z);
+  const rimCurve=new THREE.CatmullRomCurve3(PALM_BOUNDARY.map(id=>points[id]),true,'centripetal');
+  rimCurve.getPoints(PALM_RIM_POINTS).slice(0,PALM_RIM_POINTS).forEach((p,i)=>{const q=raised(p,.015);positions.setXYZ(i+1,q.x,q.y,q.z)});
+  positions.needsUpdate=true;rig.palmGeometry.computeVertexNormals();
+  const palmHeel=midpoint(points[0],midpoint(points[5],points[17]));
+  const palmWidth=Math.max(points[5].distanceTo(points[17]),.04);
+  const palmLength=Math.max(points[0].distanceTo(points[9]),.05);
+  rig.palmCore.position.copy(raised(palmHeel,-.008));rig.palmCore.quaternion.copy(palmOrientation);
+  // Main palm is a shallow muscular volume, not a ball covering the fingers.
+  rig.palmCore.scale.set(palmWidth*.43,palmLength*.45,.021);
+  const thenarCenter=points[0].clone().lerp(points[2],.48);
+  const hypothenarCenter=points[0].clone().lerp(points[17],.44);
+  rig.palmPads.forEach((pad,index)=>{
+    pad.position.copy(raised(index===0?thenarCenter:hypothenarCenter,.004));pad.quaternion.copy(palmOrientation);
+    pad.scale.set(palmWidth*(index===0?.22:.18),palmLength*(index===0?.27:.23),.020)
+  });
+  rig.webs.forEach((mesh,index)=>{
+    const [left,right]=WEB_PAIRS[index],leftBase=points[left],rightBase=points[right];
+    const leftWeb=leftBase.clone().lerp(points[left+1],.38);
+    const rightWeb=rightBase.clone().lerp(points[right+1],.38);
+    const attr=mesh.geometry.attributes.position;
+    [leftBase,leftWeb,rightWeb,rightBase].forEach((p,i)=>{const q=raised(p,.019);attr.setXYZ(i,q.x,q.y,q.z)});
+    attr.needsUpdate=true;mesh.geometry.computeVertexNormals();
+  });
+  const creasePaths=[
+    [points[5].clone().lerp(points[0],.34),points[9].clone().lerp(points[0],.28),points[13].clone().lerp(points[0],.28),points[17].clone().lerp(points[0],.34)],
+    [points[2].clone().lerp(points[0],.22),points[2].clone().lerp(points[5],.44),points[5].clone().lerp(points[9],.58),points[9].clone().lerp(points[0],.42)]
+  ];
+  rig.creases.forEach((line,index)=>{
+    const control=creasePaths[index],curve=new THREE.CatmullRomCurve3(control),samples=curve.getPoints(5),attr=line.geometry.attributes.position;
+    samples.forEach((p,i)=>{const q=raised(p,.023);attr.setXYZ(i,q.x,q.y,q.z)});attr.needsUpdate=true;line.geometry.setDrawRange(0,samples.length)
+  });
+  rig.bones.forEach(({mesh,a,b})=>{
+    const start=points[a],end=points[b],delta=end.clone().sub(start),length=Math.max(delta.length(),.002);
+    mesh.position.copy(midpoint(start,end));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize());
+    const finger=FINGERS.findIndex(path=>path.includes(b)),segment=FINGERS[finger]?.indexOf(b)??0;
+    // Proximal, middle and distal phalanges taper gradually toward the fingertip.
+    const radius=[.024,.020,.016,.013][segment];mesh.scale.set(radius/.017,length,radius/.017)
+  });
+  rig.nails.forEach(({mesh,tip})=>{
+    const p=points[tip],before=points[tip-1],direction=p.clone().sub(before).normalize();
+    mesh.position.copy(raised(p.clone().lerp(before,.23),.014));
+    const nailSide=direction.clone().cross(palmNormal).normalize();
+    const nailFrame=new THREE.Matrix4().makeBasis(nailSide,direction,palmNormal);
+    mesh.quaternion.setFromRotationMatrix(nailFrame);
+    mesh.scale.set(.009,.016,.0035)
+  });
+  const wristDirection=points[0].clone().sub(points[9]).normalize();
+  rig.wrist.position.copy(points[0].clone().addScaledVector(wristDirection,-.075));rig.wrist.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),wristDirection);
+  // Переносим только центр композиции: относительное положение двух кистей
+  // и траектория из исходного видео сохраняются в масштабе, согласованном с
+  // размером анатомической кисти. side намеренно не разводит руки искусственно.
+  rig.group.position.set(...pose.groupPosition);
+  rig.group.rotation.set(0,0,0);
+}
+let paused=false,frameIndex=0,playTimer=null,voiceQueue=[],voiceMissing=[],interSignGap=false,activeMotionFrameCount=0;
+function renderFrame(){
+  if(!activeSequence.length)return;
+  const frame=activeSequence[frameIndex++];if(!frame)return;
+  applyFacialMotion(frame);
+  applyHand(frame,0,handL,-1);applyHand(frame,63,handR,1);
+  applyBodyPose(frameIndex-1);
+  if(frameIndex>=activeSequence.length){
+    clearInterval(playTimer);playTimer=null;
+    if(voiceQueue.length){
+      if(!interSignGap){
+        interSignGap=true;
+        activeSequence=appendUntrackedFrames(activeSequence,4);
+        if(activeBodyPose)activeBodyPose=appendUntrackedFrames(activeBodyPose,4);
+        playTimer=setInterval(()=>{if(!paused)renderFrame()},1000/Math.max(1,activeFps));
+        return
+      }
+      interSignGap=false;
+      const next=voiceQueue.shift();activeSequence=next.sequence;activeBodyPose=next.body_pose||null;activeImageAspectRatio=normalizeImageAspectRatio(next.image_aspect_ratio);activeLanguage=next.language||activeLanguage;activeLabel=next.label;activeFps=next.fps;
+      playMotion();return
+    }
+    const missingText=voiceMissing.length?` Не найдены в базе: ${voiceMissing.join(', ')}.`:'';
+    document.querySelector('#caption').textContent=`Клип завершён: ${activeLabel} · ${activeSequence.length} кадров.${missingText}`;
+    voiceMissing=[];
+    // The host page validates both iframe source and sender origin; wildcard here
+    // keeps the local player working whether Streamlit was opened via localhost
+    // or 127.0.0.1 (their parent origins are different).
+    window.parent.postMessage({type:'motion-ended',label:activeLabel},'*')
+  }
+}
+function playMotion(){if(!activeSequence.length){document.querySelector('#caption').textContent='Для этой фразы нет сохранённого видео жеста.';return}clearInterval(playTimer);interSignGap=false;activeSequence=interpolateShortHandGaps(activeSequence);activeMotionFrameCount=activeSequence.length;calibrateMotion(activeSequence);handL.group.visible=false;handR.group.visible=false;frameIndex=0;paused=false;document.querySelector('#empty').hidden=true;renderFrame();playTimer=setInterval(()=>{if(!paused)renderFrame()},1000/Math.max(1,activeFps));const missingNote=voiceMissing.length?` · нет клипов: ${voiceMissing.join(', ')}`:'';const poseNote=activeBodyPose?'':' · в клипе нет плеч/локтей — показаны только кисти';document.querySelector('#caption').textContent=`Воспроизведение из motion-базы: ${activeLabel} · ${activeMotionFrameCount} кадров${missingNote}${poseNote}`}
+function startVoice(){
+  const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!Speech){document.querySelector('#caption').textContent='Голосовой ввод не поддерживается этим браузером.';return}
+  const recognition=new Speech();recognition.lang=activeLanguage;recognition.interimResults=false;
+  recognition.onresult=async event=>{
+    const phrase=event.results[0][0].transcript;document.querySelector('#caption').textContent=`Распознано: ${phrase}. Ищу клипы…`;
+    try{
+      const response=await fetch(`http://localhost:8502/api/compose?text=${encodeURIComponent(phrase)}&language=${encodeURIComponent(activeLanguage)}`);
+      if(!response.ok)throw new Error(`HTTP ${response.status}`);
+      const result=await response.json();
+      const clips=(result.segments||[]).filter(segment=>segment.type==='motion'&&Array.isArray(segment.sequence)&&segment.sequence.length);
+      voiceQueue=[];voiceMissing=result.missing||[];
+      if(!clips.length){
+        clearInterval(playTimer);playTimer=null;
+        document.querySelector('#caption').textContent=`Motion-клипы для «${phrase}» не найдены.${voiceMissing.length?` Нет в базе: ${voiceMissing.join(', ')}.`:''}`;
+        return
+      }
+      voiceQueue=clips.slice(1).map(segment=>({sequence:segment.sequence,body_pose:segment.body_pose,image_aspect_ratio:segment.image_aspect_ratio,language:result.language,label:segment.label,fps:Number(segment.fps)||30}));
+      activeSequence=clips[0].sequence;activeBodyPose=clips[0].body_pose||null;activeImageAspectRatio=normalizeImageAspectRatio(clips[0].image_aspect_ratio);activeLanguage=result.language||activeLanguage;activeLabel=clips[0].label;activeFps=Number(clips[0].fps)||30;
+      playMotion();
+      const coverage=result.missing&&result.missing.length
+        ?`Частичный перевод: нет клипов для «${result.missing.join(', ')}». `
+        :`Найдены клипы для всей фразы. `;
+      document.querySelector('#caption').textContent=`${coverage}Жесты: ${result.found.join(', ')}. Проигрываю по порядку…`
+    }catch(error){document.querySelector('#caption').textContent='Не удалось подключиться к локальной motion-базе.'}
+  };
+  recognition.onerror=event=>document.querySelector('#caption').textContent=`Не удалось распознать голос: ${event.error}`;
+  recognition.start();document.querySelector('#caption').textContent='Слушаю казахскую фразу…'
+}
+function toggle(){paused=!paused;document.querySelector('#caption').textContent=paused?'Воспроизведение приостановлено.':'Воспроизведение продолжается.'}
+function resetView(){camera.position.set(0,-.18,3.55);camera.lookAt(0,-.18,0)}
+window.addEventListener('message',event=>{
+  if(event.source!==window.parent||!event.data||typeof event.data!=='object')return;
+  const message=event.data;
+  if(message.type==='load-motion'){
+    if(!Array.isArray(message.sequence)||!message.sequence.every(frame=>Array.isArray(frame)&&frame.length>=126))return;
+    voiceQueue=[];voiceMissing=[];activeSequence=message.sequence;activeBodyPose=message.body_pose||null;activeImageAspectRatio=normalizeImageAspectRatio(message.image_aspect_ratio);activeLanguage=message.language||activeLanguage;activeLabel=String(message.label||'Жест');activeFps=Math.max(1,Number(message.fps)||30);
+    playMotion();
+  }else if(message.type==='load-motion-queue'){
+    const clips=Array.isArray(message.segments)?message.segments.filter(item=>item&&item.type==='motion'&&Array.isArray(item.sequence)&&item.sequence.every(frame=>Array.isArray(frame)&&frame.length>=126)&&item.sequence.length):[];
+    if(!clips.length){document.querySelector('#caption').textContent='В очереди нет корректных motion-клипов.';return}
+    voiceQueue=clips.slice(1).map(item=>({sequence:item.sequence,body_pose:item.body_pose,image_aspect_ratio:item.image_aspect_ratio,language:item.language,label:String(item.label||'Жест'),fps:Math.max(1,Number(item.fps)||30)}));
+    voiceMissing=Array.isArray(message.missing)?message.missing.map(String):[];
+    activeSequence=clips[0].sequence;activeBodyPose=clips[0].body_pose||null;activeImageAspectRatio=normalizeImageAspectRatio(clips[0].image_aspect_ratio);activeLanguage=clips[0].language||activeLanguage;activeLabel=String(clips[0].label||'Жест');activeFps=Math.max(1,Number(clips[0].fps)||30);
+    playMotion();
+  }else if(message.type==='play'){
+    frameIndex=0;playMotion();
+  }else if(message.type==='pause'){
+    paused=true;document.querySelector('#caption').textContent='Воспроизведение приостановлено.';
+  }else if(message.type==='resume'){
+    paused=false;document.querySelector('#caption').textContent=`Воспроизведение продолжается: ${activeLabel}.`;
+  }
+});
+function resize(){const box=document.querySelector('#scene');const w=box.clientWidth,h=box.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
+function draw(){requestAnimationFrame(draw);renderer.render(THREE_SCENE,camera)}draw();
+if(Array.isArray(initialQueue)&&initialQueue.length){
+  const clips=initialQueue.filter(item=>item&&Array.isArray(item.sequence)&&item.sequence.length);
+  if(clips.length){voiceQueue=clips.slice(1).map(item=>({sequence:item.sequence,body_pose:item.body_pose,image_aspect_ratio:item.image_aspect_ratio,language:item.language,label:item.label,fps:Number(item.fps)||30}));voiceMissing=Array.isArray(initialMissing)?initialMissing:[];activeSequence=clips[0].sequence;activeBodyPose=clips[0].body_pose||activeBodyPose;activeImageAspectRatio=normalizeImageAspectRatio(clips[0].image_aspect_ratio)||activeImageAspectRatio;activeLanguage=clips[0].language||activeLanguage;activeLabel=clips[0].label||activeLabel;activeFps=Number(clips[0].fps)||activeFps;playMotion()}
+}else if(activeSequence.length)playMotion();
+</script>
+</body></html>

@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KZH Sign Translator — Сөйлеуді ым-шараға аудару (Речь в жесты)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(180deg, #0a0a1a 0%, #0f0f2e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* --- Шапка --- */
+        header {
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        header h1 span {
+            color: #00d4aa;
+        }
+
+        header p {
+            color: #8888aa;
+            font-size: 0.9rem;
+            margin-top: 6px;
+        }
+
+        /* --- Карточка распознавания речи --- */
+        .speech-card {
+            background: rgba(15, 15, 46, 0.8);
+            border: 1px solid rgba(0, 212, 170, 0.25);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn-mic {
+            background: linear-gradient(135deg, #00d4aa 0%, #00b894 100%);
+            color: #0a0a1a;
+            border: none;
+            border-radius: 50px;
+            padding: 14px 32px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 212, 170, 0.3);
+        }
+
+        .btn-mic:hover {
+            background: linear-gradient(135deg, #00e6b8 0%, #00d4aa 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(0, 212, 170, 0.5);
+        }
+
+        .btn-mic.listening {
+            background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+            color: #ffffff;
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 4px 20px rgba(255, 71, 87, 0.4);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .recognized-box {
+            width: 100%;
+            min-height: 70px;
+            background: rgba(10, 10, 26, 0.6);
+            border: 1px dashed rgba(0, 212, 170, 0.3);
+            border-radius: 12px;
+            padding: 14px 18px;
+            font-size: 1.1rem;
+            color: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            word-wrap: break-word;
+        }
+
+        .recognized-box.placeholder {
+            color: #666688;
+            font-style: italic;
+        }
+
+        /* --- Видеоплеер жестов --- */
+        .video-card {
+            background: rgba(15, 15, 46, 0.8);
+            border: 1px solid rgba(0, 212, 170, 0.25);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .video-container {
+            width: 100%;
+            max-width: 640px;
+            aspect-ratio: 16 / 9;
+            background: #000000;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            position: relative;
+        }
+
+        .video-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .video-container.motion-active { aspect-ratio:auto; height:760px; max-width:840px; background:transparent; }
+        #motionFrame { display:none; }
+
+        .video-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #666688;
+            gap: 12px;
+            background: #0d0d24;
+        }
+
+        .video-placeholder p {
+            font-size: 0.95rem;
+        }
+
+        /* --- Индикатор прогресса слов --- */
+        .progress-subtitles {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            padding: 10px 0;
+        }
+
+        .word-badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #8888aa;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .word-badge.active {
+            background: rgba(0, 212, 170, 0.2);
+            border-color: #00d4aa;
+            color: #00d4aa;
+            font-weight: 600;
+            transform: scale(1.08);
+            box-shadow: 0 0 15px rgba(0, 212, 170, 0.3);
+        }
+
+        .word-badge.dactyl {
+            border-style: dashed;
+        }
+
+        /* --- Панель управления плеером --- */
+        .controls-bar {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .btn-ctrl {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            color: #00d4aa;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-ctrl:hover:not(:disabled) {
+            background: rgba(0, 212, 170, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn-ctrl:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: rgba(255, 255, 255, 0.1);
+            color: #666688;
+        }
+
+        /* --- Статус обработки --- */
+        .status-text {
+            font-size: 0.85rem;
+            color: #8888aa;
+            min-height: 20px;
+        }
+
+        /* --- Адаптивность --- */
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            header h1 { font-size: 1.4rem; }
+            .btn-mic { font-size: 1rem; padding: 12px 24px; }
+            .recognized-box { font-size: 0.95rem; }
+            .btn-ctrl { padding: 8px 14px; font-size: 0.85rem; }
+        }
+    </style>
+    <style>
+        /* Apple-inspired visual system */
+        :root { --ink:#1d1d1f; --muted:#6e6e73; --blue:#0071e3; --line:#d2d2d7; --surface:rgba(255,255,255,.78); }
+        body { background:linear-gradient(145deg,#f5f5f7 0%,#e9eef5 100%); color:var(--ink); padding:40px 20px 72px; }
+        .container { max-width:980px; gap:24px; }
+        header { padding:12px 0 8px; }
+        header h1 { color:var(--ink); font-size:clamp(2rem,5vw,3.7rem); letter-spacing:-.055em; font-weight:700; }
+        header h1 span { color:var(--blue); }
+        header p { color:var(--muted); font-size:1rem; }
+        .speech-card,.video-card { background:var(--surface); border:1px solid rgba(255,255,255,.7); border-radius:24px; padding:32px; box-shadow:0 16px 44px rgba(31,45,61,.10); backdrop-filter:blur(22px); }
+        .speech-card { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:20px; }
+        .typed-row { grid-column:1/-1; display:flex; gap:10px; width:100%; }
+        .typed-row input { flex:1; min-width:0; border:1px solid var(--line); border-radius:14px; padding:12px 14px; font:inherit; background:#fff; color:var(--ink); }
+        .typed-row select { border:1px solid var(--line); border-radius:14px; padding:12px 10px; font:inherit; background:#fff; color:var(--ink); }
+        .typed-row button { border:0; border-radius:14px; padding:12px 18px; background:var(--blue); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+        .btn-mic { background:var(--blue); color:#fff; border-radius:999px; padding:14px 22px; font-size:1rem; box-shadow:0 8px 20px rgba(0,113,227,.22); }
+        .btn-mic:hover { background:#0077ed; transform:translateY(-1px); box-shadow:0 11px 24px rgba(0,113,227,.28); }
+        .recognized-box { min-height:58px; background:rgba(245,245,247,.82); border:1px solid var(--line); border-radius:15px; color:var(--ink); font-size:1.05rem; }
+        .recognized-box.placeholder { color:var(--muted); }
+        .video-card { gap:22px; }
+        .video-container { max-width:760px; border:1px solid #c7c7cc; border-radius:18px; background:#111; box-shadow:0 8px 25px rgba(0,0,0,.12); }
+        .video-placeholder { background:#f5f5f7; color:var(--muted); }
+        .video-placeholder span { color:var(--blue); font-size:2.5rem !important; }
+        .word-badge { background:#f5f5f7; border:1px solid var(--line); color:var(--muted); border-radius:999px; padding:7px 14px; }
+        .word-badge.active { background:#e8f2ff; border-color:#82b9f2; color:var(--blue); box-shadow:none; }
+        .btn-ctrl { background:#f5f5f7; border:1px solid var(--line); color:var(--ink); border-radius:999px; padding:10px 18px; }
+        .btn-ctrl:hover:not(:disabled) { background:#fff; color:var(--blue); transform:translateY(-1px); }
+        .status-text { color:var(--muted); }
+        @media (max-width:650px) { body{padding:20px 12px 44px}.speech-card{grid-template-columns:1fr}.btn-mic{width:100%}.speech-card,.video-card{padding:20px;border-radius:20px} }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Шапка -->
+        <header>
+            <h1>KZH Sign <span>Translator</span></h1>
+            <p>Речь → Жесты | Казахский жестовый язык (КЖЯ)</p>
+        </header>
+
+        <!-- Распознавание речи -->
+        <section class="speech-card">
+            <button id="micBtn" class="btn-mic">
+                <span id="micIcon">●</span> <span id="micLabel">Говорить</span>
+            </button>
+            <div id="recognizedBox" class="recognized-box placeholder">
+                Айтылған сөз осы жерде пайда болады (Скажите что-нибудь на казахском языке)...
+            </div>
+            <div class="typed-row">
+                <select id="textLanguage" aria-label="Язык фразы">
+                    <option value="kk-KZ" selected>Қазақша</option>
+                    <option value="ru-RU">Русский</option>
+                </select>
+                <input id="textInput" type="text" lang="kk" placeholder="Введите фразу на казахском…" autocomplete="off">
+                <button id="translateBtn" type="button">Перевести</button>
+            </div>
+        </section>
+
+        <!-- Видеоплеер жестов -->
+        <section class="video-card">
+            <div id="videoContainer" class="video-container">
+                <div id="videoPlaceholder" class="video-placeholder">
+                    <span style="font-size: 2.5rem;">＋</span>
+                    <p>Жест көрсетілімін бастау үшін микрофонды басыңыз</p>
+                </div>
+                <iframe id="signIframe" src="" allow="autoplay" style="display: none;"></iframe>
+                <iframe id="motionFrame" title="DosYm 3D motion avatar" src="http://localhost:8502/avatar" allow="autoplay"></iframe>
+            </div>
+
+            <!-- Субтитры / Прогресс по словам -->
+            <div id="subtitlesContainer" class="progress-subtitles"></div>
+
+            <!-- Статус -->
+            <div id="statusText" class="status-text"></div>
+            <div id="missingNotice" class="status-text" role="status" aria-live="polite"></div>
+
+            <!-- Кнопки управления -->
+            <div class="controls-bar">
+                <button id="btnPlay" class="btn-ctrl" disabled>▶ Показать</button>
+                <button id="btnPause" class="btn-ctrl" disabled>⏸ Пауза</button>
+                <button id="btnRepeat" class="btn-ctrl" disabled>↻ Повторить</button>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // ============================================================
+        // 1. СЛОВАРЬ ЖЕСТОВ (Sign Dictionary)
+        // ============================================================
+        // Legacy Drive IDs in the prototype were placeholders, not real clips.
+        // Only add verified media here; actual motion clips come from SQLite.
+        const signDictionary = Object.freeze({});
+
+        // ============================================================
+        // 2. СЛОВАРЬ ДАКТИЛЯ (33+ букв казахского алфавита)
+        // ============================================================
+        // No verified alphabet clips are bundled yet. Never send a placeholder
+        // ID to Drive and present the resulting 404 as a sign.
+        const dactylDictionary = Object.freeze({});
+
+        function legacyItemsForWord(word, signs = signDictionary, letters = dactylDictionary) {
+            const direct = signs[word];
+            if (direct?.driveId && !/^DACTYL_ID_/.test(direct.driveId)) {
+                return { items: [{label: word, driveId: direct.driveId, type: 'sign'}], missing: [] };
+            }
+            const items = [], missing = [];
+            for (const letter of Array.from(word)) {
+                const driveId = letters[letter];
+                if (driveId && !/^DACTYL_ID_/.test(driveId)) {
+                    items.push({label: `${word} (${letter.toUpperCase()})`, driveId, type: 'dactyl', letter});
+                } else missing.push(letter);
+            }
+            return {items, missing};
+        }
+
+        // Keep database motion and verified legacy/dactyl fallback in source order.
+        // A missing lexical sign must remain visible as a gap, never be silently dropped.
+        function queueFromMotionSegments(result, signs = signDictionary, letters = dactylDictionary) {
+            const queue = [], unresolvedWords = [];
+            for (const segment of result.segments) {
+                if (segment.type === 'motion' && Array.isArray(segment.sequence) && segment.sequence.length) {
+                    const metadata = segment.metadata || {};
+                    queue.push({
+                        label:segment.label,
+                        type:'motion',
+                        sequence:segment.sequence,
+                        body_pose:segment.body_pose || metadata.body_pose_landmarks || null,
+                        image_aspect_ratio:segment.image_aspect_ratio || metadata.image_aspect_ratio,
+                        language:segment.language || result.language,
+                        fps:segment.fps,
+                    });
+                } else if (segment.type === 'missing') {
+                    const word = String(segment.label || '').toLowerCase();
+                    const legacy = legacyItemsForWord(word, signs, letters);
+                    queue.push(...legacy.items);
+                    // Even with letter clips, clearly disclose that the lexical sign
+                    // was unavailable and the word is being fingerspelled instead.
+                    unresolvedWords.push(word);
+                }
+            }
+            return {queue, unresolvedWords};
+        }
+
+        function showMissingMediaNotice(words) {
+            const missing = [...new Set(words.filter(Boolean))];
+            missingNotice.replaceChildren();
+            if (!missing.length) return;
+            missingNotice.append(document.createTextNode(`Нет проверенных жестовых видео для: ${missing.join(', ')}. `));
+            const link = document.createElement('a');
+            link.href = 'https://www.ai-ym.kz/ru/dictionary';
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = 'Открыть словарь AI-Ym';
+            missingNotice.append(link);
+        }
+
+        // ============================================================
+        // 3. СЛУЖЕБНЫЕ СЛОВА ДЛЯ ИСКЛЮЧЕНИЯ
+        // ============================================================
+        // ============================================================
+        // 4. ЭЛЕМЕНТЫ ИНТЕРФЕЙСА
+        // ============================================================
+        const micBtn = document.getElementById('micBtn');
+        const textInput = document.getElementById('textInput');
+        const textLanguage = document.getElementById('textLanguage');
+        textLanguage.addEventListener('change', () => {
+            textInput.lang = textLanguage.value === 'ru-RU' ? 'ru' : 'kk';
+            textInput.placeholder = textLanguage.value === 'ru-RU'
+                ? 'Введите фразу на русском…' : 'Введите фразу на казахском…';
+        });
+        const translateBtn = document.getElementById('translateBtn');
+        const micIcon = document.getElementById('micIcon');
+        const micLabel = document.getElementById('micLabel');
+        const recognizedBox = document.getElementById('recognizedBox');
+        const signIframe = document.getElementById('signIframe');
+        const motionFrame = document.getElementById('motionFrame');
+        const videoContainer = document.getElementById('videoContainer');
+        const videoPlaceholder = document.getElementById('videoPlaceholder');
+        const subtitlesContainer = document.getElementById('subtitlesContainer');
+        const statusText = document.getElementById('statusText');
+        const missingNotice = document.getElementById('missingNotice');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnPause = document.getElementById('btnPause');
+        const btnRepeat = document.getElementById('btnRepeat');
+
+        // ============================================================
+        // 5. СОСТОЯНИЕ ВОСПРОИЗВЕДЕНИЯ
+        // ============================================================
+        let sequenceQueue = [];    // Очередь элементов для показа [{label, driveId, type}]
+        let currentIndex = 0;      // Текущий индекс в очереди
+        let isPlaying = false;
+        let isPaused = false;
+        let playTimer = null;
+        let isListening = false;
+        let motionMode = false;
+        let motionQueueActive = false;
+        let motionReady = false;
+        let pendingMotion = null;
+
+        motionFrame.addEventListener('load', () => {
+            motionReady = true;
+            if (pendingMotion) {
+                motionFrame.contentWindow.postMessage(pendingMotion, 'http://localhost:8502');
+                pendingMotion = null;
+                if (isPaused) motionFrame.contentWindow.postMessage({type:'pause'}, 'http://localhost:8502');
+            }
+        });
+
+        function sendMotion(message) {
+            if (!motionReady || !motionFrame.contentWindow) return;
+            motionFrame.contentWindow.postMessage(message, 'http://localhost:8502');
+        }
+
+        function motionPlaybackMessage(item, resume = false) {
+            if (resume) return {type:'resume'};
+            return {type:'load-motion', sequence:item.sequence, body_pose:item.body_pose||null, image_aspect_ratio:item.image_aspect_ratio, language:item.language||textLanguage.value, label:item.label, fps:item.fps||30};
+        }
+
+        function motionQueueMessage(queue, missing = []) {
+            return {
+                type: 'load-motion-queue',
+                segments: queue.filter(item => item.type === 'motion').map(item => ({
+                    ...item,
+                    language: item.language || textLanguage.value,
+                })),
+                missing: queue.length === 1 ? missing : [],
+            };
+        }
+
+        window.addEventListener('message', event => {
+            if (event.source !== motionFrame.contentWindow || event.origin !== 'http://localhost:8502') return;
+            if (event.data?.type === 'motion-ended' && isPlaying && motionMode) {
+                isPaused = false;
+                if (motionQueueActive) {
+                    motionQueueActive = false;
+                    currentIndex = sequenceQueue.length;
+                    playNextItem();
+                    return;
+                }
+                currentIndex++;
+                playNextItem();
+            }
+        });
+
+        // Длительность показа одного жеста (миллисекунды)
+        const DISPLAY_DURATION_SIGN = 3000;
+        const DISPLAY_DURATION_DACTYL = 1500;
+
+        // ============================================================
+        // 6. WEB SPEECH API (Распознавание речи)
+        // ============================================================
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = textLanguage.value;
+            recognition.interimResults = false;  // Только окончательные результаты
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('listening');
+                micIcon.textContent = '⏹';
+                micLabel.textContent = 'Тыңдауда...';
+                recognizedBox.className = 'recognized-box placeholder';
+                recognizedBox.textContent = 'Сөйлеңіз, дауыс жазылуда...';
+            };
+
+            recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+                recognizedBox.className = 'recognized-box';
+                recognizedBox.textContent = transcript;
+            processText(transcript);
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                statusText.textContent = `Қателік: ${event.error}`;
+                stopListening();
+            };
+
+            recognition.onend = () => {
+                stopListening();
+            };
+        } else {
+            recognizedBox.textContent = 'Браузер Web Speech API колдамайды (Используйте Chrome или Edge).';
+            micBtn.disabled = true;
+        }
+
+        function stopListening() {
+            isListening = false;
+            micBtn.classList.remove('listening');
+            micIcon.textContent = '●';
+            micLabel.textContent = 'Говорить';
+        }
+
+        translateBtn.addEventListener('click', () => {
+            const text = textInput.value.trim();
+            if (!text) {
+                statusText.textContent = 'Сначала введите фразу на выбранном языке.';
+                textInput.focus();
+                return;
+            }
+            recognizedBox.className = 'recognized-box';
+            recognizedBox.textContent = text;
+            processText(text);
+        });
+        textInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter') translateBtn.click();
+        });
+
+        micBtn.addEventListener('click', () => {
+            if (!recognition) return;
+            if (isListening) {
+                recognition.stop();
+            } else {
+                try {
+                    recognition.lang = textLanguage.value;
+                    recognition.start();
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+        });
+
+        // ============================================================
+        // 7. ОБРАБОТКА ТЕКСТА И ФОРМИРОВАНИЕ ОЧЕРЕДИ
+        // ============================================================
+        async function processText(text) {
+            // Очищаем предыдущее воспроизведение
+            clearPlayback();
+            let motionApiUnavailable = false;
+
+            statusText.textContent = 'Іздеу: motion-базадан нақты видео-жесттерді іздеп жатырмын…';
+            try {
+                const response = await fetch(`http://localhost:8502/api/compose?text=${encodeURIComponent(text)}&language=${encodeURIComponent(textLanguage.value)}`);
+                if (!response.ok) throw new Error(`Motion API: ${response.status}`);
+                const result = await response.json();
+                if (Array.isArray(result.segments) && result.segments.some(segment => segment.type === 'motion')) {
+                    const composed = queueFromMotionSegments(result);
+                    sequenceQueue = composed.queue;
+                    if (!sequenceQueue.length) {
+                        statusText.textContent = 'Для этой фразы пока нет видео-жестов в локальной библиотеке.';
+                        showMissingMediaNotice(composed.unresolvedWords.length ? composed.unresolvedWords : result.missing || []);
+                        return;
+                    }
+                    motionMode = sequenceQueue.some(item => item.type === 'motion');
+                    renderSubtitles();
+                    enableControls(true);
+                    statusText.textContent = 'Подготовлена последовательность доступных клипов.';
+                    showMissingMediaNotice(composed.unresolvedWords);
+                    isPlaying = true;
+                    btnPlay.disabled = true;
+                    btnPause.disabled = false;
+                    currentIndex = 0;
+                    playNextItem();
+                    return;
+                }
+            } catch (error) {
+                motionApiUnavailable = true;
+            }
+
+            // Очистка и разбивка текста на слова
+            const rawWords = text.toLowerCase()
+                .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+                .trim()
+                .split(/\s+/);
+
+            sequenceQueue = [];
+
+            const unresolvedWords = [];
+            rawWords.forEach(word => {
+                if (!word) return;
+                const legacy = legacyItemsForWord(word);
+                sequenceQueue.push(...legacy.items);
+                if (legacy.missing.length) unresolvedWords.push(word);
+            });
+
+            if (sequenceQueue.length === 0) {
+                statusText.textContent = motionApiUnavailable
+                    ? 'Motion API недоступен, а проверенных локальных резервных клипов нет.'
+                    : 'Для этой фразы пока нет видео-жестов в локальной библиотеке.';
+                showMissingMediaNotice(
+                    unresolvedWords.length ? unresolvedWords : rawWords.filter(Boolean)
+                );
+                return;
+            }
+
+            renderSubtitles();
+            enableControls(true);
+            statusText.textContent = 'Подготовлена последовательность доступных клипов.';
+            showMissingMediaNotice(unresolvedWords);
+            startPlayback();
+        }
+
+        // ============================================================
+        // 8. ОТОБРАЖЕНИЕ ИНДИКАТОРА СЛОВ (Субтитры)
+        // ============================================================
+        function renderSubtitles() {
+            subtitlesContainer.innerHTML = '';
+            sequenceQueue.forEach((item, index) => {
+                const badge = document.createElement('span');
+                badge.className = `word-badge ${item.type === 'dactyl' ? 'dactyl' : ''}`;
+                badge.id = `badge-${index}`;
+                badge.textContent = item.label;
+                subtitlesContainer.appendChild(badge);
+            });
+        }
+
+        function updateSubtitlesHighlight() {
+            sequenceQueue.forEach((_, index) => {
+                const badge = document.getElementById(`badge-${index}`);
+                if (badge) {
+                    if (index === currentIndex) {
+                        badge.classList.add('active');
+                    } else {
+                        badge.classList.remove('active');
+                    }
+                }
+            });
+        }
+
+        // ============================================================
+        // 9. ЛОГИКА ВОСПРОИЗВЕДЕНИЯ
+        // ============================================================
+        function startPlayback() {
+            if (sequenceQueue.length === 0) return;
+            isPlaying = true;
+            currentIndex = 0;
+            playNextItem();
+        }
+
+        function playNextItem() {
+            if (!isPlaying) return;
+
+            if (currentIndex >= sequenceQueue.length) {
+                // Конец очереди
+                statusText.textContent = 'Көрсетілім аяқталды (Показ завершен)';
+                isPlaying = false;
+                btnPlay.disabled = false;
+                btnPause.disabled = true;
+                return;
+            }
+
+            const item = sequenceQueue[currentIndex];
+            updateSubtitlesHighlight();
+
+            if (motionMode && sequenceQueue.every(entry => entry.type === 'motion')) {
+                motionQueueActive = true;
+                motionFrame.style.display = 'block';
+                signIframe.style.display = 'none';
+                videoContainer.classList.add('motion-active');
+                statusText.textContent = `Жесты из motion-базы: ${sequenceQueue.slice(currentIndex).map(entry => entry.label).join(', ')}`;
+                const payload = motionQueueMessage(sequenceQueue.slice(currentIndex), []);
+                if (motionReady) sendMotion(payload); else pendingMotion = payload;
+                return;
+            }
+
+            if (item.type === 'motion') {
+                motionFrame.style.display = 'block';
+                signIframe.style.display = 'none';
+                videoContainer.classList.add('motion-active');
+                statusText.textContent = `Жест из motion-базы: ${item.label}`;
+                const payload = motionPlaybackMessage(item);
+                if (motionReady) sendMotion(payload); else pendingMotion = payload;
+                return;
+            }
+
+            statusText.textContent = `Көрсетілуде: ${item.label} (${item.type === 'sign' ? 'Жест' : 'Дактиль'})`;
+
+            // Показываем iframe
+            videoPlaceholder.style.display = 'none';
+            motionFrame.style.display = 'none';
+            videoContainer.classList.remove('motion-active');
+            signIframe.style.display = 'block';
+
+            // Устанавливаем preview URL для Google Drive
+            const embedUrl = `https://drive.google.com/file/d/${item.driveId}/preview`;
+            signIframe.src = embedUrl;
+
+            // Определяем длительность показа
+            const duration = item.type === 'sign' ? DISPLAY_DURATION_SIGN : DISPLAY_DURATION_DACTYL;
+
+            // Запускаем таймер перехода к следующему элементу
+            clearTimeout(playTimer);
+            playTimer = setTimeout(() => {
+                currentIndex++;
+                playNextItem();
+            }, duration);
+        }
+
+        function clearPlayback() {
+            if (motionMode) sendMotion({type:'pause'});
+            isPlaying = false;
+            isPaused = false;
+            clearTimeout(playTimer);
+            currentIndex = 0;
+            signIframe.style.display = 'none';
+            signIframe.src = '';
+            motionFrame.style.display = 'none';
+            videoContainer.classList.remove('motion-active');
+            motionMode = false;
+            motionQueueActive = false;
+            pendingMotion = null;
+            videoPlaceholder.style.display = 'flex';
+            subtitlesContainer.innerHTML = '';
+            statusText.textContent = '';
+            missingNotice.replaceChildren();
+        }
+
+        function enableControls(enable) {
+            btnPlay.disabled = !enable;
+            btnPause.disabled = !enable;
+            btnRepeat.disabled = !enable;
+        }
+
+        // ============================================================
+        // 10. КНОПКИ УПРАВЛЕНИЯ ПЛЕЕРОМ
+        // ============================================================
+        btnPlay.addEventListener('click', () => {
+            if (sequenceQueue.length === 0) return;
+            if (!isPlaying) {
+                isPlaying = true;
+                btnPlay.disabled = true;
+                btnPause.disabled = false;
+                if (isPaused) {
+                    isPaused = false;
+                    const currentItem = sequenceQueue[currentIndex];
+                    if (currentItem?.type === 'motion') {
+                        sendMotion(motionPlaybackMessage(currentItem, true));
+                        return;
+                    }
+                }
+                if (currentIndex >= sequenceQueue.length) {
+                    currentIndex = 0;
+                }
+                playNextItem();
+            }
+        });
+
+        btnPause.addEventListener('click', () => {
+            isPlaying = false;
+            isPaused = true;
+            clearTimeout(playTimer);
+            if (motionMode) sendMotion({type:'pause'});
+            btnPlay.disabled = false;
+            btnPause.disabled = true;
+            statusText.textContent = 'Пауза қойылды';
+        });
+
+        btnRepeat.addEventListener('click', () => {
+            if (sequenceQueue.length === 0) return;
+            clearTimeout(playTimer);
+            currentIndex = 0;
+            isPlaying = true;
+            isPaused = false;
+            btnPlay.disabled = true;
+            btnPause.disabled = false;
+            playNextItem();
+        });
+    </script>
+</body>
+</html>
