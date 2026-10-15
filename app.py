@@ -38,6 +38,15 @@ def _motion_library_stats() -> dict[str, int]:
     import src.motion_db as motion_db_module
     return importlib.reload(motion_db_module).library_stats()
 
+
+def _prepare_motion_uploads(project_dir, label, paths, settings):
+    from src.project_motion import prepare_project_videos
+    progress = st.progress(0, text="Готовлю жесты для аватара…")
+    return prepare_project_videos(
+        project_dir, label, paths, settings,
+        progress=lambda fraction, name: progress.progress(fraction, text=f"Подготовлено: {name}"),
+    )
+
 # ============================================================
 # НАСТРОЙКА СТРАНИЦЫ
 # ============================================================
@@ -466,6 +475,47 @@ with tab_upload:
     """, unsafe_allow_html=True)
 
     # File uploader
+    from src.project_motion import (
+        DEFAULT_SETTINGS, load_settings, read_project_json, settings_problem, write_project_json,
+    )
+    try:
+        auto_motion_settings = load_settings(proj_path)
+    except (OSError, ValueError) as settings_error:
+        st.error(f"Не удалось прочитать настройки подготовки: {settings_error}")
+        auto_motion_settings = dict(DEFAULT_SETTINGS)
+    with st.expander("Автоматическая подготовка жеста после загрузки", expanded=True):
+        st.caption(
+            f"Все видео этого проекта относятся к «{proj['name_kz']}». "
+            "Для другого слова создайте отдельный проект. После подготовки жест сразу "
+            "доступен в переводе текста; обучать модель для показа аватаром не нужно."
+        )
+        with st.form(f"auto_motion_settings_{selected_project}"):
+            auto_enabled = st.checkbox("Автоматически готовить новые видео для аватара", value=auto_motion_settings["enabled"])
+            auto_source = st.text_input("Источник записей", value=auto_motion_settings["source"])
+            auto_license = st.text_input("Основание использования записей проекта", value=auto_motion_settings["license_name"],
+                                         placeholder="Например: собственные записи с разрешением исполнителя")
+            auto_signer = st.text_input("ID исполнителя для новых видео (необязательно)", value=auto_motion_settings["signer_id"])
+            auto_mirrored = st.checkbox("Новые видео сохранены зеркально", value=auto_motion_settings["input_mirrored"])
+            auto_rights = st.checkbox("Подтверждаю право обработки и использования записей этого проекта", value=auto_motion_settings["rights_confirmed"])
+            save_auto_settings = st.form_submit_button("Сохранить настройки и подготовить видео проекта")
+        if save_auto_settings:
+            updated_settings = dict(enabled=auto_enabled, source=auto_source.strip(), license_name=auto_license.strip(),
+                                    signer_id=auto_signer.strip(), input_mirrored=auto_mirrored, rights_confirmed=auto_rights)
+            problem = settings_problem(updated_settings) if auto_enabled else None
+            if problem:
+                st.error(problem)
+            else:
+                write_project_json(proj_path, "motion_import_settings.json", updated_settings)
+                auto_motion_settings = updated_settings
+                existing_videos = sorted(path for path in videos_dir.iterdir() if path.suffix.lower() in {".mp4", ".mov", ".avi", ".mkv"})
+                if auto_enabled and existing_videos:
+                    _prepare_motion_uploads(proj_path, proj["name_kz"], existing_videos, updated_settings)
+                st.rerun()
+        problem = settings_problem(auto_motion_settings)
+        if problem:
+            st.caption(problem)
+        else:
+            st.success("Автоподготовка включена: загрузите видео ниже — жест появится в библиотеке после анализа.")
     upload_version_key = f"upload_batch_version_{selected_project}"
     processed_version_key = f"processed_upload_batch_version_{selected_project}"
     uploaded_files = st.file_uploader(
@@ -492,6 +542,8 @@ with tab_upload:
         progress_bar.progress(1.0, text="Загрузка завершена!")
         if saved_paths:
             st.success(f"Видео доступны в проекте: {len(saved_paths)} · `{videos_dir}`")
+            if settings_problem(auto_motion_settings) is None:
+                _prepare_motion_uploads(proj_path, proj["name_kz"], saved_paths, auto_motion_settings)
         if save_errors:
             if saved_paths:
                 feedback_by_project[selected_project] = save_errors
@@ -501,6 +553,18 @@ with tab_upload:
         if saved_paths:
             time.sleep(0.3)
             st.rerun()
+
+    try:
+        auto_report = read_project_json(proj_path, "motion_import_report.json")
+    except (OSError, ValueError) as report_error:
+        auto_report = {}
+        st.error(f"Не удалось прочитать отчёт подготовки: {report_error}")
+    if auto_report:
+        st.markdown("#### Готовность видео для аватара")
+        st.dataframe([
+            {"Видео": row["video"], "Слово": row["label"], "Результат": row["message"], "Клип": row.get("clip_id")}
+            for row in auto_report.values()
+        ], use_container_width=True, hide_index=True)
 
     # Отображение загруженных видео
     st.markdown("---")
@@ -1272,6 +1336,7 @@ with tab_avatar:
                     "label": segment["label"],
                     "sequence": segment["sequence"].astype(float).tolist(),
                     "body_pose": segment.get("metadata", {}).get("body_pose_landmarks"),
+                    "body_pose_world": segment.get("metadata", {}).get("body_pose_world_landmarks"),
                     "image_aspect_ratio": segment.get("metadata", {}).get("image_aspect_ratio"),
                     "language": motion_language,
                     "fps": float(segment["fps"]),
@@ -1513,6 +1578,11 @@ with tab_avatar:
         avatar_html = avatar_html.replace(
             "/*BODY_POSE__*/null",
             json.dumps(motion_queue[0].get("body_pose") if motion_queue else None,
+                       ensure_ascii=False, separators=(",", ":")),
+        )
+        avatar_html = avatar_html.replace(
+            "/*BODY_POSE_WORLD__*/null",
+            json.dumps(motion_queue[0].get("body_pose_world") if motion_queue else None,
                        ensure_ascii=False, separators=(",", ":")),
         )
         avatar_html = avatar_html.replace(

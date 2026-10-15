@@ -46,13 +46,14 @@ FACE_INDICES = [1, 6, 13, 14, 61, 291, 70, 107, 105, 300, 336, 334]
 FACE_EXTRACTOR_VERSION = "face-crop-fallback-v2"
 HAND_EXTRACTOR_VERSION = "hand-handedness-unmirrored-v1"
 POSE_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pose_landmarker_lite.task")
-POSE_EXTRACTOR_VERSION = "mediapipe-pose-video-upper-body-v3-quality"
+POSE_EXTRACTOR_VERSION = "mediapipe-pose-video-upper-body-v4-world"
 POSE_INDICES = (11, 12, 13, 14, 15, 16)  # плечи, локти, запястья
 
 
 def extract_body_pose_from_video(
     video_path: str, *, expected_frames: int | None = None,
     start_frame: int = 0, end_frame: int | None = None,
+    include_world: bool = False,
 ):
     """Return frame-aligned upper-body landmarks, or None when no local model exists.
 
@@ -88,6 +89,7 @@ def extract_body_pose_from_video(
         output_segmentation_masks=False,
     )
     frames = []
+    world_frames = []
     with vision.PoseLandmarker.create_from_options(options) as landmarker:
         frame_index = start_frame
         while frame_index < end_frame:
@@ -100,19 +102,28 @@ def extract_body_pose_from_video(
             )
             result = landmarker.detect_for_video(image, int(frame_index * 1000.0 / source_fps))
             landmarks = result.pose_landmarks[0] if result.pose_landmarks else None
+            world_landmarks = result.pose_world_landmarks[0] if result.pose_world_landmarks else None
             row = []
+            world_row = []
             for index in POSE_INDICES:
                 point = landmarks[index] if landmarks else None
                 visible = point is not None and getattr(point, "visibility", 1.0) >= 0.35
                 row.extend((float(point.x), float(point.y), float(point.z)) if visible else (0., 0., 0.))
+                world_point = world_landmarks[index] if visible and world_landmarks else None
+                world_row.extend((float(world_point.x), float(world_point.y), float(world_point.z)) if world_point else (0., 0., 0.))
             frames.append(row)
+            world_frames.append(world_row)
             frame_index += 1
     capture.release()
     if expected_frames is not None and len(frames) != expected_frames:
         raise ValueError(f"Pose дорожка: {len(frames)} кадров при {expected_frames} кадрах motion")
     if not frames or not any(any(row) for row in frames):
-        return None
-    return np.asarray(frames, dtype=np.float32)
+        return (None, None) if include_world else None
+    image_pose = np.asarray(frames, dtype=np.float32)
+    if not include_world:
+        return image_pose
+    world_pose = np.asarray(world_frames, dtype=np.float32)
+    return image_pose, world_pose if np.any(world_pose) else None
 
 
 def canonical_hand_label(category_name: str, *, input_mirrored: bool = False) -> str:

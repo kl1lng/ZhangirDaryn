@@ -23,6 +23,36 @@ from src.training_data import collect_training_sequences, prepare_training_data
 from src.training_utils import grouped_split_indices, load_label_map, save_label_map, stratified_split_indices
 
 
+class FluentSignersMetadataTests(unittest.TestCase):
+    def test_metadata_generates_review_only_manifest_for_matching_local_videos(self):
+        from src.fluentsigners50 import prepare_manifest
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            metadata = root / "metadata"
+            videos = root / "videos"
+            metadata.mkdir()
+            videos.mkdir()
+            (metadata / "russian_translation.csv").write_text(
+                "ID,Translation\n0,Привет\n1,Спасибо\n", encoding="utf-8"
+            )
+            (metadata / "gloss_annotation.csv").write_text(
+                "ID,Gloss\n0,ПРИВЕТ\n1,СПАСИБО\n", encoding="utf-8"
+            )
+            (videos / "0.mp4").write_bytes(b"video")
+            manifest = root / "motion_manifest.csv"
+
+            found, missing = prepare_manifest(videos, manifest, metadata_dir=metadata)
+
+            with manifest.open(encoding="utf-8-sig", newline="") as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual((found, missing), (1, 1))
+            self.assertEqual(rows[0]["phrase"], "ПРИВЕТ")
+            self.assertEqual(rows[0]["language"], "ru-RU")
+            self.assertEqual(rows[0]["rights_confirmed"], "false")
+            self.assertIn("sample_id=0", rows[0]["source"])
+
+
 class TrainingPipelineTests(unittest.TestCase):
     def test_database_motion_clip_is_returned_as_a_real_anatomical_playback_segment(self):
         from src.motion_db import find_gesture
@@ -777,9 +807,12 @@ class TrainingPipelineTests(unittest.TestCase):
             pose = np.zeros((4, 18), dtype=np.float32)
             pose[:, 0:18:3] = np.linspace(.35, .52, 6)
             pose[:, 1:18:3] = np.linspace(.3, .7, 6)
-            add_motion_clip(gesture_id, sequence, body_pose=pose, db_path=db_path)
+            world_pose = pose * 0.5
+            add_motion_clip(gesture_id, sequence, body_pose=pose,
+                            body_pose_world=world_pose, db_path=db_path)
             stored = find_gesture("сәлем", db_path=db_path)
             np.testing.assert_allclose(stored["metadata"]["body_pose_landmarks"], pose)
+            np.testing.assert_allclose(stored["metadata"]["body_pose_world_landmarks"], world_pose)
             self.assertEqual(stored["metadata"]["body_pose_frames"], 4)
             self.assertEqual(stored["metadata"]["body_pose_coverage"], 1.0)
             self.assertEqual(stored["metadata"]["left_arm_pose_coverage"], 1.0)

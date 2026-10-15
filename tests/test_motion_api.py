@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import threading
 import unittest
 import numpy as np
@@ -11,6 +12,25 @@ from src.motion_api import _MotionHandler
 
 
 class MotionApiLanguageTests(unittest.TestCase):
+    def test_rocketbox_glb_is_served_from_the_local_model_route(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), _MotionHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            for name in ("rocketbox-male-adult-01.glb", "rocketbox-male-adult-02.glb"):
+                model_path = Path(__file__).resolve().parents[1] / "web" / "models" / name
+                expected = model_path.read_bytes()
+                url = f"http://127.0.0.1:{server.server_port}/models/{name}"
+                with urlopen(url, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(response.headers.get_content_type(), "model/gltf-binary")
+                    self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "*")
+                    self.assertEqual(response.read(), expected)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=3)
+
     def test_compose_endpoint_passes_selected_language_to_database_lookup(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), _MotionHandler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)

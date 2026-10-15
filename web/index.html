@@ -389,6 +389,7 @@
                         type:'motion',
                         sequence:segment.sequence,
                         body_pose:segment.body_pose || metadata.body_pose_landmarks || null,
+                        body_pose_world:segment.body_pose_world || metadata.body_pose_world_landmarks || null,
                         image_aspect_ratio:segment.image_aspect_ratio || metadata.image_aspect_ratio,
                         language:segment.language || result.language,
                         fps:segment.fps,
@@ -477,7 +478,7 @@
 
         function motionPlaybackMessage(item, resume = false) {
             if (resume) return {type:'resume'};
-            return {type:'load-motion', sequence:item.sequence, body_pose:item.body_pose||null, image_aspect_ratio:item.image_aspect_ratio, language:item.language||textLanguage.value, label:item.label, fps:item.fps||30};
+            return {type:'load-motion', sequence:item.sequence, body_pose:item.body_pose||null, body_pose_world:item.body_pose_world||null, image_aspect_ratio:item.image_aspect_ratio, language:item.language||textLanguage.value, label:item.label, fps:item.fps||30};
         }
 
         function motionQueueMessage(queue, missing = []) {

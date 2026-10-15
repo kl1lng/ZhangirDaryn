@@ -26,6 +26,20 @@ class _MotionHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path in ("/models/rocketbox-male-adult-01.glb", "/models/rocketbox-male-adult-02.glb"):
+            model_path = Path(__file__).resolve().parents[1] / "web" / "models" / parsed.path.rsplit("/", 1)[-1]
+            try:
+                body = model_path.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "model/gltf-binary")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError as error:
+                self._send(404, {"error": str(error)})
+            return
         if parsed.path == "/avatar":
             avatar_path = Path(__file__).resolve().parents[1] / "web" / "avatar.html"
             try:
@@ -41,6 +55,7 @@ class _MotionHandler(BaseHTTPRequestHandler):
                     queue = [
                         {**segment, "sequence": segment["sequence"].astype(float).tolist(),
                          "body_pose": segment.get("metadata", {}).get("body_pose_landmarks"),
+                         "body_pose_world": segment.get("metadata", {}).get("body_pose_world_landmarks"),
                          "image_aspect_ratio": segment.get("metadata", {}).get("image_aspect_ratio"),
                          "body_pose_status": segment.get("metadata", {}).get("body_pose_status", "not_extracted"),
                          "language": language}
@@ -72,10 +87,16 @@ class _MotionHandler(BaseHTTPRequestHandler):
                     json.dumps(queue[0].get("body_pose") if queue else None,
                                ensure_ascii=False, separators=(",", ":")),
                 )
+                html = html.replace(
+                    "/*BODY_POSE_WORLD__*/null",
+                    json.dumps(queue[0].get("body_pose_world") if queue else None,
+                               ensure_ascii=False, separators=(",", ":")),
+                )
                 html = html.replace("/*MOTION_LANGUAGE__*/\"kk-KZ\"", json.dumps(language))
                 body = html.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -94,6 +115,7 @@ class _MotionHandler(BaseHTTPRequestHandler):
             serializable_segments = [
                 {**segment, "sequence": segment["sequence"].astype(float).tolist(),
                  "body_pose": segment.get("metadata", {}).get("body_pose_landmarks"),
+                 "body_pose_world": segment.get("metadata", {}).get("body_pose_world_landmarks"),
                  "image_aspect_ratio": segment.get("metadata", {}).get("image_aspect_ratio"),
                  "body_pose_status": segment.get("metadata", {}).get("body_pose_status", "not_extracted"),
                  "language": language}

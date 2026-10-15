@@ -279,6 +279,7 @@ def add_motion_clip(
     start_frame: int = 0,
     end_frame: int | None = None,
     body_pose: np.ndarray | None = None,
+    body_pose_world: np.ndarray | None = None,
     metadata: dict[str, Any] | None = None,
     db_path: str | Path | None = None,
 ) -> int:
@@ -309,6 +310,11 @@ def add_motion_clip(
             "left_arm_pose_coverage": float(left_arm.mean()),
             "right_arm_pose_coverage": float(right_arm.mean()),
         })
+    if body_pose_world is not None:
+        world = np.asarray(body_pose_world, dtype=np.float32)
+        if world.shape != (array.shape[0], 18) or not np.isfinite(world).all():
+            raise ValueError("body_pose_world должен иметь форму (кадры, 18) и конечные координаты")
+        clip_metadata["body_pose_world_landmarks"] = world.tolist()
     with connect(db_path) as db:
         if source_video:
             existing = db.execute(
@@ -530,31 +536,40 @@ def import_video_motion(
                 f"MediaPipe извлёк {len(full_sequence)}"
             )
         body_pose_full = None
+        body_pose_world_full = None
         pose_status = "model_missing_or_pose_not_detected"
         try:
             from src.extract_landmarks import extract_body_pose_from_video
-            body_pose_full = extract_body_pose_from_video(
+            extracted_pose = extract_body_pose_from_video(
                 str(path), expected_frames=len(full_sequence),
                 start_frame=0 if extraction_cache is not None else start_frame,
                 end_frame=total_frames if extraction_cache is not None else end_frame,
+                include_world=True,
             )
+            if isinstance(extracted_pose, tuple):
+                body_pose_full, body_pose_world_full = extracted_pose
+            else:
+                body_pose_full = extracted_pose
         except (ImportError, RuntimeError, ValueError, OSError) as error:
             pose_status = f"unavailable: {error}"
         else:
             pose_status = "available" if body_pose_full is not None else pose_status
         if extraction_cache is not None:
             extraction_cache.setdefault(str(path), {})[cache_key] = (
-                full_sequence, body_pose_full, pose_status
+                full_sequence, body_pose_full, body_pose_world_full, pose_status
             )
             raw_frames = full_sequence[start_frame:end_frame]
             body_pose = body_pose_full[start_frame:end_frame] if body_pose_full is not None else None
+            body_pose_world = body_pose_world_full[start_frame:end_frame] if body_pose_world_full is not None else None
         else:
             raw_frames = full_sequence
             body_pose = body_pose_full
+            body_pose_world = body_pose_world_full
     else:
-        full_sequence, body_pose_full, pose_status = cached_extraction
+        full_sequence, body_pose_full, body_pose_world_full, pose_status = cached_extraction
         raw_frames = full_sequence[start_frame:end_frame]
         body_pose = body_pose_full[start_frame:end_frame] if body_pose_full is not None else None
+        body_pose_world = body_pose_world_full[start_frame:end_frame] if body_pose_world_full is not None else None
     if len(raw_frames) == 0:
         raise ValueError(f"В видео не удалось извлечь landmarks: {path.name}")
     sequence = np.asarray(raw_frames, dtype=np.float32)
@@ -600,12 +615,15 @@ def import_video_motion(
     })
     if body_pose is not None and len(body_pose) != len(sequence):
         body_pose = None
+        body_pose_world = None
         pose_status = "unavailable: pose/frame count mismatch"
+    if body_pose_world is not None and len(body_pose_world) != len(sequence):
+        body_pose_world = None
     source_metadata["body_pose_status"] = pose_status
     return add_motion_clip(
         gesture_id, sequence, source_video=source_video, signer_id=signer_id,
         fps=fps, start_frame=start_frame, end_frame=end_frame,
-        body_pose=body_pose, metadata=source_metadata,
+        body_pose=body_pose, body_pose_world=body_pose_world, metadata=source_metadata,
         db_path=db_path,
     )
 

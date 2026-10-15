@@ -4,34 +4,40 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DosYm Motion Avatar</title>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
   <style>
     :root{--blue:#0071e3;--ink:#1d1d1f;--muted:#6e6e73}
     *{box-sizing:border-box}body{margin:0;min-height:100vh;padding:24px;font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:linear-gradient(145deg,#f5f5f7,#e7edf5);display:grid;place-items:center}
     .stage{width:min(800px,100%);padding:28px;background:rgba(255,255,255,.78);border:1px solid #fff;border-radius:28px;box-shadow:0 20px 60px #27384a1f;backdrop-filter:blur(24px)}
     header{display:flex;justify-content:space-between;align-items:start;margin-bottom:16px}h1{font-size:clamp(24px,4vw,38px);letter-spacing:-.05em;margin:0}.subtitle{color:var(--muted);margin:8px 0 0}.live{color:var(--blue);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
-    #scene{height:350px;border-radius:22px;overflow:hidden;background:radial-gradient(circle at 50% 30%,#fff,#dbe8f6);border:1px solid #fff;position:relative}canvas{display:block;width:100%;height:100%}.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:30px;pointer-events:none}.empty[hidden]{display:none}
+    #scene{height:min(500px,62vh);min-height:360px;border-radius:22px;overflow:hidden;background:radial-gradient(circle at 50% 30%,#fff,#dbe8f6);border:1px solid #fff;position:relative}canvas{display:block;width:100%;height:100%}.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:30px;pointer-events:none}.empty[hidden]{display:none}
     .controls{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}.controls button{border:1px solid #d2d2d7;background:#fff;color:var(--ink);border-radius:999px;padding:11px 16px;cursor:pointer;font-weight:600}.controls button.primary{background:var(--blue);border-color:var(--blue);color:#fff}.controls button:hover{transform:translateY(-1px)}.caption{margin-top:16px;background:#f5f5f7;border:1px solid #d2d2d7;border-radius:14px;padding:14px 16px;color:var(--muted)}
+    .timeline{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px;color:var(--muted);font-size:13px}.timeline input{flex:1;min-width:120px;accent-color:var(--blue)}.timeline select{border:1px solid #d2d2d7;border-radius:9px;padding:6px;background:#fff;color:var(--ink)}.timeline output{min-width:74px;font-variant-numeric:tabular-nums}
   </style>
 </head>
 <body>
 <main class="stage">
-  <header><div><h1>DosYm Motion Avatar</h1><p class="subtitle">Покадровое воспроизведение видео движений рук</p></div><span class="live">● Motion</span></header>
+  <header><div><h1>DosYm Motion Avatar</h1><p class="subtitle">Экспериментальная 3D-реконструкция · точность жестов требует проверки носителями КЖЯ</p></div><span class="live">● Motion</span></header>
   <section id="scene"><canvas id="canvas"></canvas><div id="empty" class="empty">Нет клипа для введённой фразы.<br>Добавьте видео жеста в motion-библиотеку.</div></section>
   <div class="controls"><button class="primary" onclick="playMotion()">▶ Воспроизвести</button><button onclick="startVoice()">● Сказать фразу</button><button onclick="toggle()">Ⅱ Пауза</button><button onclick="resetView()">↺ Сбросить вид</button></div>
+  <div class="timeline"><input id="motion-progress" aria-label="Позиция анимации" type="range" min="0" max="1" step="0.01" value="0"><output id="motion-time">0.0 / 0.0 с</output><label>Скорость <select id="motion-speed"><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select></label></div>
   <div id="caption" class="caption">Ожидание клипа.</div>
 </main>
-<script>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 let activeSequence=__MOTION_SEQUENCE__;
 let activeLabel=__MOTION_LABEL__;
 let activeFps=__MOTION_FPS__;
 let activeImageAspectRatio=normalizeImageAspectRatio(/*IMAGE_ASPECT_RATIO__*/1);
 let activeBodyPose=/*BODY_POSE__*/null;
+let activeBodyPoseWorld=/*BODY_POSE_WORLD__*/null;
 let activeLanguage=/*MOTION_LANGUAGE__*/"kk-KZ";
 let initialQueue=/*MOTION_QUEUE__*/[];
 let initialMissing=/*MOTION_MISSING__*/[];
 const THREE_SCENE=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(36,1,.01,100);camera.position.set(0,-.18,3.55);camera.lookAt(0,-.18,0);
+const camera=new THREE.PerspectiveCamera(36,1,.01,100);camera.position.set(0,.32,2.05);camera.lookAt(0,.32,0);
+function frameCamera(){camera.position.set(0,.32,2.05);camera.lookAt(0,.32,0);camera.updateProjectionMatrix()}
 const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('#canvas'),antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 THREE_SCENE.add(new THREE.HemisphereLight(0xffffff,0x879bb0,2.1));
 const keyLight=new THREE.DirectionalLight(0xffffff,1.6);keyLight.position.set(-1,2,3);THREE_SCENE.add(keyLight);
@@ -49,6 +55,58 @@ const liveMouth=new THREE.Line(liveMouthGeometry,new THREE.LineBasicMaterial({co
 const mouthCavity=new THREE.Mesh(new THREE.SphereGeometry(1,20,12),new THREE.MeshBasicMaterial({color:0x342026}));mouthCavity.visible=false;face.add(mouthCavity);
 const browLines=[0,1].map(()=>{const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(9),3));const line=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:0x49352f}));line.visible=false;face.add(line);return line});
 
+// Load a locally hosted, licensed Rocketbox human. The measured hand meshes
+// remain driven by the original frame landmarks; no canned sign animations are
+// substituted for the motion database.
+let humanAvatar=null,humanRigBones=null,humanRigRest=null,humanRigFingers=null;
+const avatarLoader=new GLTFLoader();
+avatarLoader.load('http://127.0.0.1:8502/models/rocketbox-male-adult-02.glb',gltf=>{
+  humanAvatar=gltf.scene;
+  actor.add(humanAvatar);humanAvatar.updateMatrixWorld(true);
+  const bounds=new THREE.Box3().setFromObject(humanAvatar),size=bounds.getSize(new THREE.Vector3());
+  const nodes=new Map();humanAvatar.traverse(node=>{if(node.name)nodes.set(node.name,node)});
+  const headBone=nodes.get('Bip01_Head');
+  const footBones=[nodes.get('Bip01_L_Foot'),nodes.get('Bip01_R_Foot')].filter(Boolean);
+  const headY=headBone?.getWorldPosition(new THREE.Vector3()).y;
+  const footY=footBones.length?footBones.reduce((sum,bone)=>sum+bone.getWorldPosition(new THREE.Vector3()).y,0)/footBones.length:NaN;
+  const skeletonHeight=headY-footY;
+  const sourceHeight=Number.isFinite(skeletonHeight)&&skeletonHeight>.1?skeletonHeight:Math.max(size.x,size.y,size.z);
+  if(!Number.isFinite(sourceHeight)||sourceHeight<.1)throw new Error('У модели некорректный размер.');
+  // Skinned mesh bounds report only the bind-pose envelope for this asset;
+  // the rig's head-to-foot distance gives the actual character height.
+  humanAvatar.scale.setScalar(1.75/sourceHeight);humanAvatar.updateMatrixWorld(true);
+  const scaledHeadBone=nodes.get('Bip01_Head');
+  if(scaledHeadBone){const headPosition=scaledHeadBone.getWorldPosition(new THREE.Vector3());humanAvatar.position.add(new THREE.Vector3(-headPosition.x,.58-headPosition.y,-.18-headPosition.z))}
+  humanAvatar.updateMatrixWorld(true);
+  const boneNames=[
+    'Bip01_L_UpperArm','Bip01_L_Forearm','Bip01_L_Hand',
+    'Bip01_R_UpperArm','Bip01_R_Forearm','Bip01_R_Hand',
+  ];
+  humanRigBones=boneNames.map(name=>nodes.get(name)||null);
+  if(humanRigBones.some(bone=>!bone))throw new Error(`Не найдены кости рук: ${[...nodes.keys()].filter(name=>/UpperArm|Forearm| Hand$/.test(name)).join(', ')||'в загруженной сцене нет узлов скелета'}`);
+  humanRigRest=humanRigBones.map(bone=>({position:bone.position.clone(),quaternion:bone.quaternion.clone()}));
+  humanRigFingers=['L','R'].map(side=>[0,1,2,3,4].map(finger=>{
+    const names=[`Bip01_${side}_Finger${finger}`,`Bip01_${side}_Finger${finger}1`,`Bip01_${side}_Finger${finger}2`];
+    const bones=names.map(name=>nodes.get(name));
+    if(bones.some(bone=>!bone||!bone.isBone))throw new Error(`У модели отсутствуют кости пальца ${side}${finger}`);
+    return{bones,rest:bones.map(bone=>({position:bone.position.clone(),quaternion:bone.quaternion.clone()}))}
+  }));
+  humanAvatar.updateMatrixWorld(true);
+  calibrateFingerJoints();
+  if(activeSequence.length)calibrateMotion(activeSequence);
+  frameCamera();
+  if(activeBodyPose){
+    handL.group.visible=false;handR.group.visible=false;
+    if(playTimer===null&&frameIndex>=activeSequence.length)applyNeutralPose();
+    else if(playTimer!==null)renderFrame();
+  }
+  torso.visible=false;neck.visible=false;head.visible=false;face.visible=false;
+  staticMouth.visible=false;liveMouth.visible=false;mouthCavity.visible=false;browLines.forEach(line=>line.visible=false);
+  document.querySelector('.live').textContent='● 3D HUMAN · MOTION DB';
+},undefined,error=>{
+  console.error('DosYm human avatar failed to load',error);
+  document.querySelector('#caption').textContent=`Не удалось загрузить 3D-модель человека (${error?.message||'ошибка сети'}); используется резервный аватар.`;
+});
 // One hand contains a skinned-looking palm plate, 21 joints and 20 tapered phalanges.
 const LINKS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20]];
 const FINGERS=[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]];
@@ -71,10 +129,10 @@ function createHand(color){
   const palmPads=[0,1].map(()=>{const pad=new THREE.Mesh(new THREE.SphereGeometry(1,20,14),skin);group.add(pad);return pad});
   const joints=[];for(let i=0;i<21;i++){
     const isKnuckle=[1,2,5,6,9,10,13,14,17,18].includes(i);
-    const radius=i===0?.039:(isKnuckle?.030:.023);
+    const radius=i===0?.030:(isKnuckle?.018:.014);
     const joint=new THREE.Mesh(new THREE.SphereGeometry(radius,20,16),skin);group.add(joint);joints.push(joint)
   }
-  const bones=[];for(const[a,b]of LINKS){const bone=new THREE.Mesh(new THREE.CylinderGeometry(.014,.020,1,12,1),skin);group.add(bone);bones.push({mesh:bone,a,b})}
+  const bones=[];for(const[a,b]of LINKS){const bone=new THREE.Mesh(new THREE.CylinderGeometry(.010,.014,1,12,1),skin);group.add(bone);bones.push({mesh:bone,a,b})}
   // Thin membranes make the palm read as one hand rather than five detached rods.
   const webs=WEB_PAIRS.map(()=>{
     const geometry=new THREE.BufferGeometry();
@@ -91,7 +149,7 @@ function createHand(color){
     const tip=finger[3],nail=new THREE.Mesh(new THREE.SphereGeometry(1,16,10),nailMat);
     group.add(nail);nails.push({mesh:nail,tip})
   }
-  const wrist=new THREE.Mesh(new THREE.CapsuleGeometry(.047,.16,5,12),skin);group.add(wrist);
+  const wrist=new THREE.Mesh(new THREE.CapsuleGeometry(.033,.13,5,12),skin);group.add(wrist);
   return{group,palm,palmGeometry,palmCore,palmPads,joints,bones,webs,creases,nails,wrist,color};
 }
 const handL=createHand(0x0071e3),handR=createHand(0xff9500);
@@ -101,12 +159,14 @@ const armMaterial=new THREE.MeshStandardMaterial({color:0xd59a79,roughness:.68})
 function createLimb(){const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.052,.068,1,16),armMaterial);actor.add(mesh);mesh.visible=false;return mesh}
 const limbs=Array.from({length:4},createLimb);
 function setLimb(mesh,a,b,radius){const delta=b.clone().sub(a),length=delta.length();if(length<.025){mesh.visible=false;return}mesh.visible=true;mesh.position.copy(midpoint(a,b));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());mesh.scale.set(radius/.06,length,radius/.06)}
-function matchPoseWristHands(poseWrists,handWrists){
+let lastHandAssignment=null,previousArmPole=[null,null],previousWristTwist=[null,null];
+function matchPoseWristHands(poseWrists,handWrists,previous=null){
   let leftHandIndex=0;
   if(handWrists[0].visible&&handWrists[1].visible){
     const direct=Math.hypot(poseWrists[0].x-handWrists[0].x,poseWrists[0].y-handWrists[0].y)+Math.hypot(poseWrists[1].x-handWrists[1].x,poseWrists[1].y-handWrists[1].y);
     const crossed=Math.hypot(poseWrists[0].x-handWrists[1].x,poseWrists[0].y-handWrists[1].y)+Math.hypot(poseWrists[1].x-handWrists[0].x,poseWrists[1].y-handWrists[0].y);
     leftHandIndex=crossed<direct?1:0;
+    if(previous!==null&&Math.abs(direct-crossed)<.025)leftHandIndex=previous;
   }else if(handWrists[0].visible){
     leftHandIndex=Math.hypot(poseWrists[1].x-handWrists[0].x,poseWrists[1].y-handWrists[0].y)<Math.hypot(poseWrists[0].x-handWrists[0].x,poseWrists[0].y-handWrists[0].y)?1:0;
   }else if(handWrists[1].visible){
@@ -114,38 +174,230 @@ function matchPoseWristHands(poseWrists,handWrists){
   }
   return[leftHandIndex,1-leftHandIndex];
 }
-function applyBodyPose(index){
-  const frame=activeBodyPose?.[index];
+function applyBodyPose(index,frame=activeBodyPose?.[index],source=activeSequence[index],worldFrame=activeBodyPoseWorld?.[index]){
   if(!Array.isArray(frame)||frame.length!==18){limbs.forEach(limb=>limb.visible=false);return}
-  const point=i=>{const x=Number(frame[i*3]),y=Number(frame[i*3+1]),z=Number(frame[i*3+2]);if(!Number.isFinite(x+y+z)||(!x&&!y&&!z))return null;return new THREE.Vector3((x-motionPlacement.centerX)*motionPlacement.worldPerImageUnit*motionPlacement.imageAspectRatio,motionPlacement.targetY-(y-motionPlacement.centerY)*motionPlacement.worldPerImageUnit,.12-z*.08)};
+  const point=i=>bodyPosePoint(frame,i,index,worldFrame);
   const ls=point(0),rs=point(1),le=point(2),re=point(3);
   // Tasks handedness labels can be reversed on mirrored source footage. Match
   // Pose wrists to actual hand wrists per frame instead of assuming label parity.
-  const source=activeSequence[index],handWrists=[0,63].map(offset=>({
+  const handWrists=[0,63].map(offset=>({
     x:Number(source?.[offset])||0,y:Number(source?.[offset+1])||0,
-    group:offset===0?handL:handR,visible:offset===0?handL.group.visible:handR.group.visible
+    group:offset===0?handL:handR,visible:offset===0?handL.tracked:handR.tracked
   }));
   const poseWrists=[4,5].map(i=>({x:Number(frame[i*3])||0,y:Number(frame[i*3+1])||0}));
-  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-  const [leftHandIndex,rightHandIndex]=matchPoseWristHands(poseWrists,handWrists);
-  // Hand and pose tracks are extracted from the same source frame. Once
-  // matched, the arm endpoint must be the rendered hand's actual wrist (3-D
-  // depth included); an arbitrary 2-D distance cutoff created visible gaps.
-  const wristEnd=(poseIndex,handIndex)=>handWrists[handIndex].visible
-      ?handWrists[handIndex].group.group.position.clone():point(4+poseIndex);
+  const [leftHandIndex,rightHandIndex]=matchPoseWristHands(poseWrists,handWrists,lastHandAssignment);
+  if(handWrists.every(hand=>hand.visible))lastHandAssignment=leftHandIndex;
+  // The two MediaPipe trackers use different depth origins. Drive the arm
+  // from the pose wrist, keeping the hand track for palm and finger rotation.
+  const wristEnd=(poseIndex,handIndex)=>point(4+poseIndex)||
+      (handWrists[handIndex].visible?handWrists[handIndex].group.group.position.clone():null);
   const lw=wristEnd(0,leftHandIndex),rw=wristEnd(1,rightHandIndex);
-  if(ls&&le&&lw){setLimb(limbs[0],ls,le,.065);setLimb(limbs[1],le,lw,.047)}else{limbs[0].visible=false;limbs[1].visible=false}
-  if(rs&&re&&rw){setLimb(limbs[2],rs,re,.065);setLimb(limbs[3],re,rw,.047)}else{limbs[2].visible=false;limbs[3].visible=false}
+  if(humanAvatar&&humanRigBones){
+    limbs.forEach(limb=>limb.visible=false);
+    humanRigBones.forEach((bone,i)=>{bone.position.copy(humanRigRest[i].position);bone.quaternion.copy(humanRigRest[i].quaternion)});
+    humanAvatar.updateMatrixWorld(true);
+    if(le&&lw)solveRigArm(0,1,2,le,lw);
+    if(re&&rw)solveRigArm(3,4,5,re,rw);
+    if(handWrists[leftHandIndex].visible)poseNativeHand(0,handWrists[leftHandIndex].group.pose);
+    if(handWrists[rightHandIndex].visible)poseNativeHand(1,handWrists[rightHandIndex].group.pose);
+  }else{
+    if(ls&&le&&lw){setLimb(limbs[0],ls,le,.065);setLimb(limbs[1],le,lw,.047)}else{limbs[0].visible=false;limbs[1].visible=false}
+    if(rs&&re&&rw){setLimb(limbs[2],rs,re,.065);setLimb(limbs[3],re,rw,.047)}else{limbs[2].visible=false;limbs[3].visible=false}
+  }
+}
+function bodyPosePoint(frame,index,frameIndex,worldFrame=activeBodyPoseWorld?.[frameIndex]){
+  const x=Number(frame[index*3]),y=Number(frame[index*3+1]),z=Number(frame[index*3+2]);
+  if(!Number.isFinite(x+y+z)||(!x&&!y&&!z))return null;
+  const shoulderDepth=humanRigBones?.[index%2===0?0:3]?.getWorldPosition(new THREE.Vector3()).z??.12;
+  const imageShoulderZ=Number(frame[(index%2)*3+2])||0;
+  let depth=shoulderDepth+(imageShoulderZ-z)*.08;
+  const world=worldFrame;
+  if(Array.isArray(world)&&world.length===18){
+    const shoulderZ=Number(world[(index%2)*3+2]);
+    const jointZ=Number(world[index*3+2]);
+    if(Number.isFinite(shoulderZ)&&Number.isFinite(jointZ)&&
+       (world[(index%2)*3]||world[(index%2)*3+1])&&
+       (world[index*3]||world[index*3+1])){
+      // MediaPipe world landmarks are in metres, centred at the hips. Keep
+      // image-space x/y registration but use measured shoulder-relative depth.
+      depth=shoulderDepth+THREE.MathUtils.clamp((shoulderZ-jointZ)*.85,-.28,.28);
+    }
+  }
+  const worldX=(x-motionPlacement.centerX)*motionPlacement.horizontalScale;
+  const worldY=motionPlacement.targetY-(y-motionPlacement.centerY)*motionPlacement.worldPerImageUnit;
+  if(index>=4){
+    // A seated signer's hands can be in front of their lap while a standing
+    // avatar's same shoulder-relative depth places them inside its shirt.
+    // Only lift wrists toward the camera where they overlap the lower torso;
+    // keep x/y motion and palm shape from the measured landmarks unchanged.
+    const overTorso=THREE.MathUtils.clamp((.36-Math.abs(worldX))/.15,0,1);
+    const belowChest=THREE.MathUtils.clamp((.22-worldY)/.22,0,1);
+    depth+=Math.max(0,.07-depth)*overTorso*belowChest;
+  }
+  return new THREE.Vector3(worldX,worldY,depth)
+}
+function solveRigArm(upperIndex,foreIndex,handIndex,elbowHint,wristTarget){
+  const upper=humanRigBones[upperIndex],fore=humanRigBones[foreIndex],hand=humanRigBones[handIndex];
+  const shoulder=upper.getWorldPosition(new THREE.Vector3());
+  const naturalElbow=fore.getWorldPosition(new THREE.Vector3());
+  const naturalWrist=hand.getWorldPosition(new THREE.Vector3());
+  const upperLength=shoulder.distanceTo(naturalElbow),foreLength=naturalElbow.distanceTo(naturalWrist);
+  if(upperLength<.01||foreLength<.01)return;
+  const toWrist=wristTarget.clone().sub(shoulder);
+  if(toWrist.lengthSq()<1e-8)return;
+  const axis=toWrist.normalize();
+  const reachAtBend=angle=>Math.sqrt(upperLength*upperLength+foreLength*foreLength+2*upperLength*foreLength*Math.cos(angle));
+  const reach=THREE.MathUtils.clamp(shoulder.distanceTo(wristTarget),reachAtBend(155*Math.PI/180),reachAtBend(3*Math.PI/180));
+  const wrist=shoulder.clone().addScaledVector(axis,reach);
+  const along=(upperLength*upperLength-foreLength*foreLength+reach*reach)/(2*reach);
+  const bend=Math.sqrt(Math.max(0,upperLength*upperLength-along*along));
+  let bendDirection=elbowHint.clone().sub(shoulder).addScaledVector(axis,-elbowHint.clone().sub(shoulder).dot(axis));
+  if(bendDirection.lengthSq()<1e-6)bendDirection=naturalElbow.clone().sub(shoulder).addScaledVector(axis,-naturalElbow.clone().sub(shoulder).dot(axis));
+  if(bendDirection.lengthSq()<1e-6)bendDirection=new THREE.Vector3(0,0,1).addScaledVector(axis,-axis.z);
+  const side=upperIndex===0?0:1,previous=previousArmPole[side];
+  if(previous&&bend<.04){
+    const stable=previous.clone().addScaledVector(axis,-previous.dot(axis));
+    if(stable.lengthSq()>1e-6)bendDirection.normalize().lerp(stable.normalize(),1-bend/.04);
+  }
+  previousArmPole[side]=bendDirection.clone().normalize();
+  const elbow=shoulder.clone().addScaledVector(axis,along).addScaledVector(bendDirection.normalize(),bend);
+  placeRigSegment(upperIndex,foreIndex,shoulder,elbow);
+  placeRigSegment(foreIndex,handIndex,elbow,wrist)
+}
+function applyNeutralPose(){
+  if(!humanAvatar||!humanRigBones)return;
+  humanRigBones.forEach((bone,i)=>{bone.position.copy(humanRigRest[i].position);bone.quaternion.copy(humanRigRest[i].quaternion)});
+  humanRigFingers?.flat().forEach(chain=>chain.bones.forEach((bone,i)=>{
+    bone.position.copy(chain.rest[i].position);bone.quaternion.copy(chain.rest[i].quaternion)
+  }));
+  humanAvatar.updateMatrixWorld(true);
+  for(const [upperIndex,foreIndex,handIndex] of [[0,1,2],[3,4,5]]){
+    const shoulder=humanRigBones[upperIndex].getWorldPosition(new THREE.Vector3());
+    const elbowRest=humanRigBones[foreIndex].getWorldPosition(new THREE.Vector3());
+    const wristRest=humanRigBones[handIndex].getWorldPosition(new THREE.Vector3());
+    const outward=Math.sign(shoulder.x)||1;
+    const upperDirection=new THREE.Vector3(outward*.16,-1,0).normalize();
+    const foreDirection=new THREE.Vector3(outward*.08,-1,0).normalize();
+    const elbow=shoulder.clone().addScaledVector(upperDirection,shoulder.distanceTo(elbowRest));
+    const wrist=elbow.clone().addScaledVector(foreDirection,elbowRest.distanceTo(wristRest));
+    placeRigSegment(upperIndex,foreIndex,shoulder,elbow);
+    placeRigSegment(foreIndex,handIndex,elbow,wrist)
+  }
+  handL.group.visible=false;handR.group.visible=false
+}
+function placeRigSegment(boneIndex,childIndex,start,end){
+  const bone=humanRigBones[boneIndex],child=humanRigBones[childIndex],direction=end.clone().sub(start);
+  if(direction.lengthSq()<1e-8)return;
+  const parent=bone.parent;parent.updateMatrixWorld(true);
+  // Rocketbox is a skinned rig: translating a joint to a noisy landmark
+  // stretches the weighted sleeve and forearm mesh. IK already computes an
+  // elbow and wrist reachable with the model's own bone lengths, so rotate
+  // the bones while retaining every bind-pose joint offset.
+  const targetDirection=end.clone().sub(bone.getWorldPosition(new THREE.Vector3()))
+    .transformDirection(new THREE.Matrix4().copy(parent.matrixWorld).invert());
+  const restRotation=humanRigRest[boneIndex].quaternion;
+  const restDirection=humanRigRest[childIndex].position.clone().applyQuaternion(restRotation).normalize();
+  const delta=new THREE.Quaternion().setFromUnitVectors(restDirection,targetDirection);
+  bone.quaternion.copy(delta.multiply(restRotation));
+  humanAvatar.updateMatrixWorld(true)
+}
+function palmBasis(across,long){
+  const y=long.clone().normalize();
+  const x=across.clone().addScaledVector(y,-across.dot(y));
+  if(y.lengthSq()<1e-8||x.lengthSq()<1e-8)return null;
+  x.normalize();
+  const z=x.clone().cross(y).normalize();
+  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x,y,z))
+}
+function signedJointAngle(incoming,outgoing,axis){
+  return Math.atan2(incoming.clone().cross(outgoing).dot(axis),THREE.MathUtils.clamp(incoming.dot(outgoing),-1,1));
+}
+function calibrateFingerJoints(){
+  humanRigFingers.forEach((chains,side)=>{
+    const hand=humanRigBones[side===0?2:5];
+    const across=chains[4].rest[0].position.clone().sub(chains[1].rest[0].position);
+    const long=chains[2].rest[0].position.clone();
+    const normal=across.cross(long).normalize().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()));
+    chains.forEach(chain=>{
+      const directions=chain.bones.map((bone,i)=>{
+        const local=i<2?chain.rest[i+1].position.clone():chain.rest[2].position.clone();
+        return local.normalize().applyQuaternion(bone.getWorldQuaternion(new THREE.Quaternion()));
+      });
+      chain.hinges=chain.bones.map((bone,i)=>{
+        const incoming=directions[Math.max(0,i-1)],axis=incoming.clone().cross(normal).normalize();
+        const restAngle=i?signedJointAngle(incoming,directions[i],axis):0;
+        return{axis:axis.applyQuaternion(bone.getWorldQuaternion(new THREE.Quaternion()).invert()),restAngle,flexSign:Math.abs(restAngle)>.005?Math.sign(restAngle):(side===0?1:-1)};
+      });
+    });
+  });
+}
+function poseNativeHand(side,pose){
+  if(!pose||!humanRigFingers)return;
+  const hand=humanRigBones[side===0?2:5],chains=humanRigFingers[side];
+  const points=pose.points.map(point=>new THREE.Vector3(point.x,point.y,point.z));
+  const restAcross=chains[4].rest[0].position.clone().sub(chains[1].rest[0].position);
+  const restLong=chains[2].rest[0].position.clone();
+  const targetAcross=points[17].clone().sub(points[5]);
+  const targetLong=points[9].clone().sub(points[0]);
+  if(Math.min(restAcross.lengthSq(),restLong.lengthSq(),targetAcross.lengthSq(),targetLong.lengthSq())<1e-8)return;
+  const restBasis=palmBasis(restAcross,restLong),targetBasis=palmBasis(targetAcross,targetLong);
+  if(!restBasis||!targetBasis)return;
+  const targetWorld=targetBasis.multiply(restBasis.invert()).normalize();
+  const forearm=hand.parent,parentRotation=forearm.getWorldQuaternion(new THREE.Quaternion());
+  const local=parentRotation.clone().invert().multiply(targetWorld);
+  const delta=local.clone().multiply(humanRigRest[side===0?2:5].quaternion.clone().invert()).normalize();
+  const axis=hand.position.clone().normalize(),projected=axis.x*delta.x+axis.y*delta.y+axis.z*delta.z;
+  let twist=2*Math.atan2(projected,delta.w);
+  if(previousWristTwist[side]!==null)twist+=Math.round((previousWristTwist[side]-twist)/(2*Math.PI))*2*Math.PI;
+  previousWristTwist[side]=twist;
+  // Pronation belongs partly to the forearm. Rotate around its longitudinal
+  // axis (wrist position stays fixed), then compensate at the wrist so the
+  // measured palm orientation remains exact.
+  forearm.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axis,THREE.MathUtils.clamp(twist*.45,-1.2,1.2)));
+  forearm.updateMatrixWorld(true);
+  hand.quaternion.copy(forearm.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(targetWorld)).normalize();
+  hand.updateMatrixWorld(true);
+  chains.forEach((chain,finger)=>{
+    const ids=FINGERS[finger];
+    chain.bones.forEach((bone,segment)=>{
+      const direction=points[ids[segment+1]].clone().sub(points[ids[segment]]);
+      if(direction.lengthSq()<1e-8)return;
+      if(finger!==0&&segment>0){
+        // PIP/DIP are hinge joints. Independent 3-D aiming adds impossible
+        // sideways bends and twist when a fingertip tracker is noisy.
+        const incoming=points[ids[segment]].clone().sub(points[ids[segment-1]]).normalize();
+        const normal=targetAcross.clone().cross(targetLong).normalize();
+        const axis=incoming.clone().cross(normal).normalize(),hinge=chain.hinges[segment];
+        if(axis.lengthSq()<1e-8)return;
+        const measured=signedJointAngle(incoming,direction.normalize(),axis)*hinge.flexSign;
+        const angle=THREE.MathUtils.clamp(measured,-.18,segment===1?1.92:1.57)*hinge.flexSign;
+        bone.quaternion.copy(chain.rest[segment].quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(hinge.axis,angle-hinge.restAngle));
+        bone.updateMatrixWorld(true);return;
+      }
+      const parent=bone.parent;
+      const target=direction.normalize().applyQuaternion(parent.getWorldQuaternion(new THREE.Quaternion()).invert());
+      const restDirection=segment<2
+        ?chain.rest[segment+1].position.clone().applyQuaternion(chain.rest[segment].quaternion).normalize()
+        :chain.rest[segment].position.clone().applyQuaternion(chain.rest[segment].quaternion).normalize();
+      const delta=new THREE.Quaternion().setFromUnitVectors(restDirection,target);
+      const swing=2*Math.acos(THREE.MathUtils.clamp(Math.abs(delta.w),0,1));
+      if(swing>1.95)delta.slerp(new THREE.Quaternion(),1-1.95/swing);
+      bone.quaternion.copy(delta.multiply(chain.rest[segment].quaternion));
+      bone.updateMatrixWorld(true)
+    })
+  });
+  humanAvatar.updateMatrixWorld(true)
 }
 const boneColors=[0x0071e3,0xff9500];
 function normalizeImageAspectRatio(value){const ratio=Number(value);return THREE.MathUtils.clamp(Number.isFinite(ratio)&&ratio>0?ratio:1,.25,4)}
 // Калибровка положения всего клипа. Масштаб кисти и её координаты должны
 // использовать одну систему: иначе две настоящие кисти из close-up видео
 // оказываются почти в одной точке у аватара.
-let motionPlacement={centerX:.5,centerY:.5,worldPerImageUnit:3,imageAspectRatio:1,targetY:.02};
+let motionPlacement={centerX:.5,centerY:.5,worldPerImageUnit:2,horizontalScale:2,handScale:3,imageAspectRatio:1,targetY:.58};
 function calibrateMotion(sequence){
-  const faceX=[],faceY=[],handLengths=[];
-  for(const frame of sequence){
+  const faceX=[],faceY=[],handLengths=[],noseToShoulder=[],shoulderYs=[],armVertical=[];
+  for(let frameIndex=0;frameIndex<sequence.length;frameIndex++){
+    const frame=sequence[frameIndex];
     for(const offset of [0,63]){
       const wristX=Number(frame[offset]),wristY=Number(frame[offset+1]);
       const middleX=Number(frame[offset+27]),middleY=Number(frame[offset+28]);
@@ -160,13 +412,40 @@ function calibrateMotion(sequence){
     if(Number.isFinite(noseX+noseY)&&(noseX!==0||noseY!==0)){
       faceX.push(noseX);faceY.push(noseY)
     }
+    const pose=activeBodyPose?.[frameIndex];
+    if(Array.isArray(pose)&&pose.length>=6){
+      const shoulderY=(Number(pose[1])+Number(pose[4]))/2;
+      const delta=shoulderY-noseY;
+      if(Number.isFinite(delta)&&delta>.025)noseToShoulder.push(delta)
+      if(Number.isFinite(shoulderY)&&shoulderY>0){
+        shoulderYs.push(shoulderY);
+        for(const wristOffset of [13,16]){
+          const wristY=Number(pose[wristOffset]);
+          if(Number.isFinite(wristY)&&wristY>0)armVertical.push(Math.abs(wristY-shoulderY))
+        }
+      }
+    }
   }
   const median=values=>{if(!values.length)return .5;const sorted=[...values].sort((a,b)=>a-b);return sorted[Math.floor(sorted.length/2)]};
   const medianLength=median(handLengths);
-  // Визуальная длина запястье→средний MCP равна ~0.26 единицы аватара.
-  // Ставим разумные пределы для неполных/ошибочных landmarks.
-  const worldPerImageUnit=THREE.MathUtils.clamp(.26/Math.max(medianLength,.025),1.5,7);
-  motionPlacement={centerX:median(faceX),centerY:median(faceY),worldPerImageUnit,imageAspectRatio:activeImageAspectRatio,targetY:.58};
+  // Keep image-to-body placement calibrated from nose-to-shoulder anatomy.
+  // Hand landmarks are a close-up track and need their own scale; reusing that
+  // scale for the whole frame used to send wrists below the avatar's feet.
+  const handScale=.68*THREE.MathUtils.clamp(.26/Math.max(medianLength,.025),1.5,7);
+  const bodyScale=noseToShoulder.length ? .30/median(noseToShoulder) : 2;
+  const horizontalScale=THREE.MathUtils.clamp(bodyScale,1.5,3.2)*activeImageAspectRatio;
+  const trackedShoulders=shoulderYs.length>sequence.length*.4;
+  const armLength=humanRigBones?Math.min(...[[0,1,2],[3,4,5]].map(([a,b,c])=>
+    humanRigBones[a].getWorldPosition(new THREE.Vector3()).distanceTo(humanRigBones[b].getWorldPosition(new THREE.Vector3()))+
+    humanRigBones[b].getWorldPosition(new THREE.Vector3()).distanceTo(humanRigBones[c].getWorldPosition(new THREE.Vector3())))):.65;
+  const verticalRange=armVertical.length?Math.max(...armVertical):.4;
+  const worldPerImageUnit=trackedShoulders
+    ?THREE.MathUtils.clamp(Math.min(bodyScale,armLength*.87/Math.max(verticalRange,.1)),.9,3.2)
+    :THREE.MathUtils.clamp(bodyScale,1.5,3.2);
+  const targetY=trackedShoulders&&humanRigBones
+    ?(humanRigBones[0].getWorldPosition(new THREE.Vector3()).y+humanRigBones[3].getWorldPosition(new THREE.Vector3()).y)/2
+    :(trackedShoulders ? 0.39 : 0.58);
+  motionPlacement={centerX:median(faceX),centerY:trackedShoulders?median(shoulderYs):median(faceY),worldPerImageUnit,horizontalScale,handScale,imageAspectRatio:activeImageAspectRatio,targetY};
 }
 function midpoint(a,b){return a.clone().add(b).multiplyScalar(.5)}
 function handTracked(frame,offset){
@@ -198,10 +477,66 @@ function interpolateShortHandGaps(sequence,maxGap=3){
   }
   return frames
 }
-function appendUntrackedFrames(sequence,count=4){
-  if(!Array.isArray(sequence)||!sequence.length||count<=0)return sequence;
-  const width=sequence[0].length;
-  return sequence.concat(Array.from({length:count},()=>Array(width).fill(0)))
+function sampleMotionTrack(track,position){
+  if(!track?.length)return null;
+  const index=Math.min(Math.floor(position),track.length-1),a=track[index],b=track[Math.min(index+1,track.length-1)];
+  const amount=position-index;
+  if(amount<=0||a===b)return a;
+  const result=a.slice();
+  for(let k=0;k<a.length;k+=3){
+    // Zero triples are missing detections, never a point at the image origin.
+    const validA=a.slice(k,k+3).some(v=>Math.abs(v)>1e-9),validB=b.slice(k,k+3).some(v=>Math.abs(v)>1e-9);
+    if(validA&&validB)for(let j=k;j<Math.min(k+3,a.length);j++)result[j]=a[j]+(b[j]-a[j])*amount;
+  }
+  return result;
+}
+function stabilizeMotionTrack(track,fps,minCutoff=4,beta=18){
+  if(!track?.length)return null;
+  const result=track.map(frame=>frame.slice()),rate=Math.max(1,Number(fps)||30);
+  const alpha=cutoff=>1/(1+rate/(2*Math.PI*cutoff));
+  // Bidirectional One Euro filtering for recorded clips: less jitter at rest,
+  // higher cutoff during fast signing, no systematic forward-time lag.
+  for(let k=0;k<track[0].length;k+=3){
+    let start=0;
+    const valid=i=>track[i].slice(k,k+3).every(Number.isFinite)&&track[i].slice(k,k+3).some(v=>Math.abs(v)>1e-9);
+    while(start<track.length){
+      while(start<track.length&&!valid(start))start++;
+      let end=start;while(end<track.length&&valid(end))end++;
+      if(end-start>2)for(let axis=k;axis<Math.min(k+3,track[0].length);axis++){
+        const pass=reverse=>{
+          const values=[],first=reverse?end-1:start,step=reverse?-1:1;
+          let value=track[first][axis],previous=value,velocity=0;
+          for(let i=first;i>=start&&i<end;i+=step){
+            const raw=track[i][axis],speed=(raw-previous)*rate;
+            velocity+=alpha(1)*(speed-velocity);
+            value+=alpha(minCutoff+beta*Math.abs(velocity))*(raw-value);
+            values[i-start]=value;previous=raw;
+          }
+          return values;
+        };
+        const forward=pass(false),backward=pass(true);
+        for(let i=start+1;i<end-1;i++)result[i][axis]=(forward[i-start]+backward[i-start])*.5;
+      }
+      start=Math.max(end,start+1);
+    }
+  }
+  return result;
+}
+function stabilizeHandTrack(sequence,fps){
+  const result=sequence.map(frame=>frame.slice());
+  for(const offset of [0,63]){
+    // Separate hand translation from articulation. Filtering global finger
+    // coordinates independently can bend a rigid hand during a fast sweep.
+    const local=sequence.map(frame=>{
+      if(!handTracked(frame,offset))return Array(63).fill(0);
+      return Array.from({length:63},(_,k)=>k<3?frame[offset+k]:frame[offset+k]-frame[offset+k%3]);
+    });
+    const filtered=stabilizeMotionTrack(local,fps,7,30);
+    for(let i=0;i<sequence.length;i++)if(handTracked(sequence[i],offset)){
+      for(let k=0;k<63;k++)result[i][offset+k]=filtered[i][k]+(k<3?0:filtered[i][k%3]);
+    }
+  }
+  return result;
 }
 function applyFacialMotion(frame){
   const offset=126,facePoints=[];
@@ -243,7 +578,7 @@ function calculateHandPose(frame,offset,placement){
   const raw=[];for(let i=0;i<21;i++){const k=offset+i*3;raw.push({x:Number(frame[k])||0,y:Number(frame[k+1])||0,z:Number(frame[k+2])||0})}
   const wrist=raw[0];const detected=raw.some((p,i)=>i>0&&Math.hypot(p.x-wrist.x,p.y-wrist.y,p.z-wrist.z)>.012);
   if(!detected)return null;
-  const scale=placement.worldPerImageUnit;
+  const scale=placement.handScale;
   // Keep the measured 3-D orientation. Canonicalizing every palm to point up
   // makes different signs look alike and loses palm-facing / foreshortening.
   // MediaPipe uses image-down Y and camera-negative Z; the avatar uses Y-up,
@@ -252,14 +587,21 @@ function calculateHandPose(frame,offset,placement){
     const dx=p.x-wrist.x,dy=p.y-wrist.y;
     return{x:dx*scale*placement.imageAspectRatio,y:-dy*scale,z:-(p.z-wrist.z)*scale*placement.imageAspectRatio}
   });
-  const x=(wrist.x-placement.centerX)*placement.worldPerImageUnit*placement.imageAspectRatio;
+  const x=(wrist.x-placement.centerX)*(placement.horizontalScale??placement.worldPerImageUnit*placement.imageAspectRatio);
   const y=placement.targetY-(wrist.y-placement.centerY)*placement.worldPerImageUnit;
-  return{points,groupPosition:[x,y,.34-wrist.z*scale]}
+  // Body and wrist must share approximately the same depth plane. The hand's
+  // local 3-D landmarks still retain full depth for palm and finger rotation.
+  return{points,groupPosition:[x,y,.12-wrist.z*scale*.15]}
 }
 function applyHand(frame,offset,rig,side){
   const pose=calculateHandPose(frame,offset,motionPlacement);
   // Короткие провалы трекера не должны резко прятать кисть из финального кадра.
-  if(!pose){rig.group.visible=false;return}rig.group.visible=true;
+  // Hold the last real landmark pose through brief tracker dropouts and the
+  // short untracked tail commonly present at the end of source clips.
+  if(!pose){rig.tracked=false;rig.group.visible=false;return}
+  rig.tracked=true;rig.pose=pose;rig.group.position.set(...pose.groupPosition);
+  if(humanAvatar&&humanRigFingers&&activeBodyPose){rig.group.visible=false;return}
+  rig.group.visible=true;rig.group.scale.setScalar(.70);
   // All 21 measured points drive this anatomical hand directly, including
   // out-of-plane rotation. Do not independently stretch palm width/length:
   // that changes the actual sign shape captured in the source video.
@@ -309,7 +651,7 @@ function applyHand(frame,offset,rig,side){
     mesh.position.copy(midpoint(start,end));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize());
     const finger=FINGERS.findIndex(path=>path.includes(b)),segment=FINGERS[finger]?.indexOf(b)??0;
     // Proximal, middle and distal phalanges taper gradually toward the fingertip.
-    const radius=[.024,.020,.016,.013][segment];mesh.scale.set(radius/.017,length,radius/.017)
+    const radius=[.014,.012,.010,.008][segment];mesh.scale.set(radius/.012,length,radius/.012)
   });
   rig.nails.forEach(({mesh,tip})=>{
     const p=points[tip],before=points[tip-1],direction=p.clone().sub(before).normalize();
@@ -327,37 +669,118 @@ function applyHand(frame,offset,rig,side){
   rig.group.position.set(...pose.groupPosition);
   rig.group.rotation.set(0,0,0);
 }
-let paused=false,frameIndex=0,playTimer=null,voiceQueue=[],voiceMissing=[],interSignGap=false,activeMotionFrameCount=0;
-function renderFrame(){
-  if(!activeSequence.length)return;
-  const frame=activeSequence[frameIndex++];if(!frame)return;
+let paused=false,frameIndex=0,playTimer=null,voiceQueue=[],voiceMissing=[],activeMotionFrameCount=0;
+let motionTracks=null,playbackElapsed=0,lastPlaybackTime=null,playbackGeneration=0,neutralTransition=null;
+let openingPose=null,openingRestEnd=0,closingRestStart=null;
+function findOpeningRestEnd(sequence,pose,fps){
+  if(!sequence?.length||!pose?.[0])return 0;
+  const first=sequence[0],shoulderY=(pose[0][1]+pose[0][4])*.5;
+  if(![1,64].every(k=>first[k]>shoulderY+.25))return 0;
+  const limit=Math.min(sequence.length-1,Math.ceil(fps*.8),Math.floor(sequence.length*.45));
+  for(let i=1;i<=limit;i++)for(const offset of [0,63]){
+    if(handTracked(sequence[i],offset)&&(first[offset+1]-sequence[i][offset+1]>.055||Math.abs(first[offset]-sequence[i][offset])>.06))return i;
+  }
+  return 0;
+}
+function findClosingRestStart(sequence,pose,fps){
+  const reversed=findOpeningRestEnd(sequence?.slice().reverse(),pose?.slice().reverse(),fps);
+  return reversed>0?sequence.length-1-reversed:null;
+}
+function stopMotion(){if(playTimer!==null)cancelAnimationFrame(playTimer);playTimer=null;lastPlaybackTime=null;playbackGeneration++}
+function rigPoseBones(){return humanRigBones?[...humanRigBones,...humanRigFingers.flatMap(chains=>chains.flatMap(chain=>chain.bones))]:[]}
+function presentMotionSample(position){
+  const frame=sampleMotionTrack(motionTracks.sequence,position);if(!frame)return;
+  frameIndex=Math.min(activeSequence.length,Math.floor(position)+1);
   applyFacialMotion(frame);
   applyHand(frame,0,handL,-1);applyHand(frame,63,handR,1);
-  applyBodyPose(frameIndex-1);
-  if(frameIndex>=activeSequence.length){
-    clearInterval(playTimer);playTimer=null;
+  applyBodyPose(Math.floor(position),sampleMotionTrack(motionTracks.pose,position),frame,sampleMotionTrack(motionTracks.world,position));
+}
+function presentMotionWithOpening(position){
+  if(humanRigBones&&!openingPose){
+    applyNeutralPose();
+    const bones=rigPoseBones();openingPose={bones,from:bones.map(bone=>bone.quaternion.clone())};
+  }
+  const closingBlendStart=closingRestStart===null?Infinity:Math.max(openingRestEnd+activeFps*.28,closingRestStart-activeFps*.28);
+  presentMotionSample(Math.min(position,closingBlendStart));
+  if(openingPose){
+    if(position>=closingBlendStart){
+      const amount=THREE.MathUtils.smoothstep(position,closingBlendStart,closingRestStart);
+      openingPose.bones.forEach((bone,i)=>bone.quaternion.slerpQuaternions(bone.quaternion.clone(),openingPose.from[i],amount));
+      humanAvatar.updateMatrixWorld(true);return;
+    }
+    // Replace the seated source's idle lead-in with the avatar's arms-down
+    // stance, then blend directly into the moving sign at the same timestamp.
+    const amount=THREE.MathUtils.smoothstep((position-openingRestEnd)/Math.max(1,activeFps),0,.28);
+    if(amount<1){
+      openingPose.bones.forEach((bone,i)=>bone.quaternion.slerpQuaternions(openingPose.from[i],bone.quaternion.clone(),amount));
+      humanAvatar.updateMatrixWorld(true);
+    }
+  }
+}
+function renderFrame(){
+  if(!motionTracks||!activeSequence.length)return;
+  const duration=activeSequence.length/Math.max(1,activeFps);
+  const position=Math.min(playbackElapsed*Math.max(1,activeFps),activeSequence.length-1);
+  document.querySelector('#motion-progress').value=position;
+  document.querySelector('#motion-time').textContent=`${Math.min(playbackElapsed,duration).toFixed(1)} / ${duration.toFixed(1)} с`;
+  if(playbackElapsed<duration){presentMotionWithOpening(position);return}
+  if(!neutralTransition){
+    presentMotionWithOpening(activeSequence.length-1);
+    const bones=rigPoseBones(),from=bones.map(bone=>bone.quaternion.clone());
+    applyNeutralPose();
+    neutralTransition={bones,from,to:bones.map(bone=>bone.quaternion.clone())};
+  }
+  const amount=THREE.MathUtils.smoothstep(playbackElapsed-duration,0,.18);
+  neutralTransition.bones.forEach((bone,i)=>bone.quaternion.slerpQuaternions(neutralTransition.from[i],neutralTransition.to[i],amount));
+  humanAvatar?.updateMatrixWorld(true);
+  if(amount>=1){
+    stopMotion();frameIndex=activeSequence.length;
     if(voiceQueue.length){
-      if(!interSignGap){
-        interSignGap=true;
-        activeSequence=appendUntrackedFrames(activeSequence,4);
-        if(activeBodyPose)activeBodyPose=appendUntrackedFrames(activeBodyPose,4);
-        playTimer=setInterval(()=>{if(!paused)renderFrame()},1000/Math.max(1,activeFps));
-        return
-      }
-      interSignGap=false;
-      const next=voiceQueue.shift();activeSequence=next.sequence;activeBodyPose=next.body_pose||null;activeImageAspectRatio=normalizeImageAspectRatio(next.image_aspect_ratio);activeLanguage=next.language||activeLanguage;activeLabel=next.label;activeFps=next.fps;
+      const next=voiceQueue.shift();activeSequence=next.sequence;activeBodyPose=next.body_pose||null;activeBodyPoseWorld=next.body_pose_world||null;activeImageAspectRatio=normalizeImageAspectRatio(next.image_aspect_ratio);activeLanguage=next.language||activeLanguage;activeLabel=next.label;activeFps=next.fps;
       playMotion();return
     }
     const missingText=voiceMissing.length?` Не найдены в базе: ${voiceMissing.join(', ')}.`:'';
     document.querySelector('#caption').textContent=`Клип завершён: ${activeLabel} · ${activeSequence.length} кадров.${missingText}`;
     voiceMissing=[];
+    applyNeutralPose();
     // The host page validates both iframe source and sender origin; wildcard here
     // keeps the local player working whether Streamlit was opened via localhost
     // or 127.0.0.1 (their parent origins are different).
     window.parent.postMessage({type:'motion-ended',label:activeLabel},'*')
   }
 }
-function playMotion(){if(!activeSequence.length){document.querySelector('#caption').textContent='Для этой фразы нет сохранённого видео жеста.';return}clearInterval(playTimer);interSignGap=false;activeSequence=interpolateShortHandGaps(activeSequence);activeMotionFrameCount=activeSequence.length;calibrateMotion(activeSequence);handL.group.visible=false;handR.group.visible=false;frameIndex=0;paused=false;document.querySelector('#empty').hidden=true;renderFrame();playTimer=setInterval(()=>{if(!paused)renderFrame()},1000/Math.max(1,activeFps));const missingNote=voiceMissing.length?` · нет клипов: ${voiceMissing.join(', ')}`:'';const poseNote=activeBodyPose?'':' · в клипе нет плеч/локтей — показаны только кисти';document.querySelector('#caption').textContent=`Воспроизведение из motion-базы: ${activeLabel} · ${activeMotionFrameCount} кадров${missingNote}${poseNote}`}
+function advanceMotion(now){
+  const generation=playbackGeneration;
+  if(playTimer===null)return;
+  if(lastPlaybackTime!==null&&!paused)playbackElapsed+=Math.min(.1,Math.max(0,(now-lastPlaybackTime)/1000))*Number(document.querySelector('#motion-speed').value);
+  lastPlaybackTime=now;
+  if(!paused)renderFrame();
+  if(playTimer!==null&&generation===playbackGeneration)playTimer=requestAnimationFrame(advanceMotion);
+}
+function playMotion(){
+  if(!activeSequence.length){document.querySelector('#caption').textContent='Для этой фразы нет сохранённого видео жеста.';return}
+  stopMotion();
+  motionTracks={sequence:stabilizeHandTrack(interpolateShortHandGaps(activeSequence),activeFps),pose:stabilizeMotionTrack(activeBodyPose,activeFps),world:stabilizeMotionTrack(activeBodyPoseWorld,activeFps)};
+  activeMotionFrameCount=activeSequence.length;calibrateMotion(activeSequence);
+  openingPose=null;openingRestEnd=findOpeningRestEnd(activeSequence,activeBodyPose,activeFps);
+  closingRestStart=findClosingRestStart(activeSequence,activeBodyPose,activeFps);
+  if(closingRestStart!==null&&closingRestStart<=openingRestEnd+activeFps*.56)closingRestStart=null;
+  handL.group.visible=false;handR.group.visible=false;handL.tracked=false;handR.tracked=false;handL.pose=null;handR.pose=null;
+  lastHandAssignment=null;previousArmPole=[null,null];previousWristTwist=[null,null];frameIndex=0;playbackElapsed=0;neutralTransition=null;paused=false;
+  document.querySelector('#empty').hidden=true;document.querySelector('#motion-progress').max=Math.max(0,activeSequence.length-1);
+  renderFrame();playTimer=requestAnimationFrame(advanceMotion);
+  const missingNote=voiceMissing.length?` · нет клипов: ${voiceMissing.join(', ')}`:'';
+  const poseNote=activeBodyPose?'':' · в клипе нет плеч/локтей — показаны только кисти';
+  document.querySelector('#caption').textContent=`Воспроизведение из motion-базы: ${activeLabel} · ${activeMotionFrameCount} кадров${missingNote}${poseNote}`;
+}
+document.querySelector('#motion-progress').addEventListener('input',event=>{
+  if(!activeSequence.length)return;
+  if(!motionTracks)playMotion();
+  paused=true;lastPlaybackTime=null;neutralTransition=null;previousArmPole=[null,null];previousWristTwist=[null,null];
+  playbackElapsed=Number(event.target.value)/Math.max(1,activeFps);renderFrame();
+  if(playTimer===null)playTimer=requestAnimationFrame(advanceMotion);
+  document.querySelector('#caption').textContent=`Пауза: ${activeLabel}.`;
+});
 function startVoice(){
   const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!Speech){document.querySelector('#caption').textContent='Голосовой ввод не поддерживается этим браузером.';return}
@@ -371,12 +794,12 @@ function startVoice(){
       const clips=(result.segments||[]).filter(segment=>segment.type==='motion'&&Array.isArray(segment.sequence)&&segment.sequence.length);
       voiceQueue=[];voiceMissing=result.missing||[];
       if(!clips.length){
-        clearInterval(playTimer);playTimer=null;
+        stopMotion();
         document.querySelector('#caption').textContent=`Motion-клипы для «${phrase}» не найдены.${voiceMissing.length?` Нет в базе: ${voiceMissing.join(', ')}.`:''}`;
         return
       }
-      voiceQueue=clips.slice(1).map(segment=>({sequence:segment.sequence,body_pose:segment.body_pose,image_aspect_ratio:segment.image_aspect_ratio,language:result.language,label:segment.label,fps:Number(segment.fps)||30}));
-      activeSequence=clips[0].sequence;activeBodyPose=clips[0].body_pose||null;activeImageAspectRatio=normalizeImageAspectRatio(clips[0].image_aspect_ratio);activeLanguage=result.language||activeLanguage;activeLabel=clips[0].label;activeFps=Number(clips[0].fps)||30;
+      voiceQueue=clips.slice(1).map(segment=>({sequence:segment.sequence,body_pose:segment.body_pose,body_pose_world:segment.body_pose_world,image_aspect_ratio:segment.image_aspect_ratio,language:result.language,label:segment.label,fps:Number(segment.fps)||30}));
+      activeSequence=clips[0].sequence;activeBodyPose=clips[0].body_pose||null;activeBodyPoseWorld=clips[0].body_pose_world||null;activeImageAspectRatio=normalizeImageAspectRatio(clips[0].image_aspect_ratio);activeLanguage=result.language||activeLanguage;activeLabel=clips[0].label;activeFps=Number(clips[0].fps)||30;
       playMotion();
       const coverage=result.missing&&result.missing.length
         ?`Частичный перевод: нет клипов для «${result.missing.join(', ')}». `
@@ -387,35 +810,36 @@ function startVoice(){
   recognition.onerror=event=>document.querySelector('#caption').textContent=`Не удалось распознать голос: ${event.error}`;
   recognition.start();document.querySelector('#caption').textContent='Слушаю казахскую фразу…'
 }
-function toggle(){paused=!paused;document.querySelector('#caption').textContent=paused?'Воспроизведение приостановлено.':'Воспроизведение продолжается.'}
-function resetView(){camera.position.set(0,-.18,3.55);camera.lookAt(0,-.18,0)}
+function toggle(){if(playTimer===null){playMotion();return}paused=!paused;lastPlaybackTime=null;document.querySelector('#caption').textContent=paused?'Воспроизведение приостановлено.':'Воспроизведение продолжается.'}
+function resetView(){frameCamera()}
 window.addEventListener('message',event=>{
   if(event.source!==window.parent||!event.data||typeof event.data!=='object')return;
   const message=event.data;
   if(message.type==='load-motion'){
     if(!Array.isArray(message.sequence)||!message.sequence.every(frame=>Array.isArray(frame)&&frame.length>=126))return;
-    voiceQueue=[];voiceMissing=[];activeSequence=message.sequence;activeBodyPose=message.body_pose||null;activeImageAspectRatio=normalizeImageAspectRatio(message.image_aspect_ratio);activeLanguage=message.language||activeLanguage;activeLabel=String(message.label||'Жест');activeFps=Math.max(1,Number(message.fps)||30);
+    voiceQueue=[];voiceMissing=[];activeSequence=message.sequence;activeBodyPose=message.body_pose||null;activeBodyPoseWorld=message.body_pose_world||null;activeImageAspectRatio=normalizeImageAspectRatio(message.image_aspect_ratio);activeLanguage=message.language||activeLanguage;activeLabel=String(message.label||'Жест');activeFps=Math.max(1,Number(message.fps)||30);
     playMotion();
   }else if(message.type==='load-motion-queue'){
     const clips=Array.isArray(message.segments)?message.segments.filter(item=>item&&item.type==='motion'&&Array.isArray(item.sequence)&&item.sequence.every(frame=>Array.isArray(frame)&&frame.length>=126)&&item.sequence.length):[];
     if(!clips.length){document.querySelector('#caption').textContent='В очереди нет корректных motion-клипов.';return}
-    voiceQueue=clips.slice(1).map(item=>({sequence:item.sequence,body_pose:item.body_pose,image_aspect_ratio:item.image_aspect_ratio,language:item.language,label:String(item.label||'Жест'),fps:Math.max(1,Number(item.fps)||30)}));
+    voiceQueue=clips.slice(1).map(item=>({sequence:item.sequence,body_pose:item.body_pose,body_pose_world:item.body_pose_world,image_aspect_ratio:item.image_aspect_ratio,language:item.language,label:String(item.label||'Жест'),fps:Math.max(1,Number(item.fps)||30)}));
     voiceMissing=Array.isArray(message.missing)?message.missing.map(String):[];
-    activeSequence=clips[0].sequence;activeBodyPose=clips[0].body_pose||null;activeImageAspectRatio=normalizeImageAspectRatio(clips[0].image_aspect_ratio);activeLanguage=clips[0].language||activeLanguage;activeLabel=String(clips[0].label||'Жест');activeFps=Math.max(1,Number(clips[0].fps)||30);
+    activeSequence=clips[0].sequence;activeBodyPose=clips[0].body_pose||null;activeBodyPoseWorld=clips[0].body_pose_world||null;activeImageAspectRatio=normalizeImageAspectRatio(clips[0].image_aspect_ratio);activeLanguage=clips[0].language||activeLanguage;activeLabel=String(clips[0].label||'Жест');activeFps=Math.max(1,Number(clips[0].fps)||30);
     playMotion();
   }else if(message.type==='play'){
     frameIndex=0;playMotion();
   }else if(message.type==='pause'){
-    paused=true;document.querySelector('#caption').textContent='Воспроизведение приостановлено.';
+    paused=true;lastPlaybackTime=null;document.querySelector('#caption').textContent='Воспроизведение приостановлено.';
   }else if(message.type==='resume'){
-    paused=false;document.querySelector('#caption').textContent=`Воспроизведение продолжается: ${activeLabel}.`;
+    paused=false;lastPlaybackTime=null;document.querySelector('#caption').textContent=`Воспроизведение продолжается: ${activeLabel}.`;
   }
 });
-function resize(){const box=document.querySelector('#scene');const w=box.clientWidth,h=box.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
+function resize(){const box=document.querySelector('#scene');const w=box.clientWidth,h=box.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;frameCamera()}addEventListener('resize',resize);resize();
 function draw(){requestAnimationFrame(draw);renderer.render(THREE_SCENE,camera)}draw();
+window.playMotion=playMotion;window.startVoice=startVoice;window.toggle=toggle;window.resetView=resetView;
 if(Array.isArray(initialQueue)&&initialQueue.length){
   const clips=initialQueue.filter(item=>item&&Array.isArray(item.sequence)&&item.sequence.length);
-  if(clips.length){voiceQueue=clips.slice(1).map(item=>({sequence:item.sequence,body_pose:item.body_pose,image_aspect_ratio:item.image_aspect_ratio,language:item.language,label:item.label,fps:Number(item.fps)||30}));voiceMissing=Array.isArray(initialMissing)?initialMissing:[];activeSequence=clips[0].sequence;activeBodyPose=clips[0].body_pose||activeBodyPose;activeImageAspectRatio=normalizeImageAspectRatio(clips[0].image_aspect_ratio)||activeImageAspectRatio;activeLanguage=clips[0].language||activeLanguage;activeLabel=clips[0].label||activeLabel;activeFps=Number(clips[0].fps)||activeFps;playMotion()}
+  if(clips.length){voiceQueue=clips.slice(1).map(item=>({sequence:item.sequence,body_pose:item.body_pose,body_pose_world:item.body_pose_world,image_aspect_ratio:item.image_aspect_ratio,language:item.language,label:item.label,fps:Number(item.fps)||30}));voiceMissing=Array.isArray(initialMissing)?initialMissing:[];activeSequence=clips[0].sequence;activeBodyPose=clips[0].body_pose||activeBodyPose;activeBodyPoseWorld=clips[0].body_pose_world||activeBodyPoseWorld;activeImageAspectRatio=normalizeImageAspectRatio(clips[0].image_aspect_ratio)||activeImageAspectRatio;activeLanguage=clips[0].language||activeLanguage;activeLabel=clips[0].label||activeLabel;activeFps=Number(clips[0].fps)||activeFps;playMotion()}
 }else if(activeSequence.length)playMotion();
 </script>
 </body></html>

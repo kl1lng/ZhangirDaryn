@@ -35,8 +35,12 @@ wheels/
 data/
 models/
 external/
+# The reviewed CC0 presentation model is a checked-in app asset, not a trained weight.
+!web/models/
+!web/models/**
 
 # Logs & temporary files
+node_modules/
 *.log
 .DS_Store
 For Erke

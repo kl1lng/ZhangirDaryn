@@ -69,24 +69,6 @@ test('avatar keeps long and boundary hand gaps instead of inventing movements', 
   assert.equal(interpolate(boundaryGap, 3)[0][0], 0);
 });
 
-test('avatar separates queued source clips with untracked frames, not interpolated signs', () => {
-  const start = html.indexOf('function appendUntrackedFrames(');
-  const end = html.indexOf('function applyFacialMotion(', start);
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-  const sequence = [[.1, .2], [.3, .4]];
-  const context = {sequence, result:null};
-  vm.runInNewContext(
-    `${html.slice(start, end)}\nresult=appendUntrackedFrames(sequence,2);`, context,
-  );
-  assert.deepEqual(Array.from(context.result, (frame) => Array.from(frame)), [
-    [.1, .2], [.3, .4], [0, 0], [0, 0],
-  ]);
-  assert.deepEqual(sequence, [[.1, .2], [.3, .4]], 'source motion is not modified');
-  assert.match(html, /if\(!interSignGap\)[\s\S]*?appendUntrackedFrames\(activeSequence,4\)/,
-    'the playback queue inserts a short neutral gap between independent clips');
-});
-
 test('avatar preserves all measured 3-D hand orientation and uniform anatomy', () => {
   const poseStart = html.indexOf('function calculateHandPose(');
   const poseEnd = html.indexOf('function applyHand(', poseStart);
@@ -114,7 +96,7 @@ test('avatar preserves all measured 3-D hand orientation and uniform anatomy', (
     rotated[i * 3 + 2] = wristZ - y * Math.sin(angle);
   }
   const context = {
-    frame, rotated, placement: {centerX: 0.5, centerY: 0.5, worldPerImageUnit: 2, imageAspectRatio: 1, targetY: 0.025},
+    frame, rotated, placement: {centerX: 0.5, centerY: 0.5, worldPerImageUnit: 2, handScale: 2, imageAspectRatio: 1, targetY: 0.025},
     poses: null,
   };
   vm.runInNewContext(
@@ -128,7 +110,7 @@ test('avatar preserves all measured 3-D hand orientation and uniform anatomy', (
   assert.ok(Math.abs(tilted.points[1].y - 0.08 * Math.cos(angle)) < 1e-10);
   assert.ok(Math.abs(tilted.points[1].z + 0.08 * Math.sin(angle)) < 1e-10,
     'out-of-plane palm rotation survives into the avatar geometry');
-  assert.ok(Math.abs(upright.groupPosition[2] - (0.34 + 0.24)) < 1e-10,
+  assert.ok(Math.abs(upright.groupPosition[2] - (0.12 + 0.24 * .15)) < 1e-10,
     'wrist depth moves the complete hand in 3-D');
   assert.equal(upright.points.length, 21, 'all MediaPipe hand landmarks are retained');
   const handRenderer = html.slice(poseEnd, html.indexOf('let paused=', poseEnd));
@@ -142,7 +124,7 @@ test('avatar preserves all measured 3-D hand orientation and uniform anatomy', (
     'finger webs are offset along the palm normal, not a fixed screen axis');
 });
 
-test('avatar anchors source body and hands to the tracked face instead of centering wrists', () => {
+test('avatar uses the tracked face as fallback when no shoulder pose exists', () => {
   const start = html.indexOf('function calibrateMotion(');
   const end = html.indexOf('function midpoint(', start);
   assert.notEqual(start, -1);
@@ -158,7 +140,7 @@ test('avatar anchors source body and hands to the tracked face instead of center
     frame[offset + 28] = .62;
   }
   const context = {
-    sequence: [frame], activeImageAspectRatio: 16 / 9, result: null,
+    sequence: [frame], activeImageAspectRatio: 16 / 9, activeBodyPose: null, humanRigBones:null, result: null,
     THREE: {MathUtils: {clamp:(value,min,max)=>Math.max(min,Math.min(max,value))}},
   };
   vm.runInNewContext(`${code}\ncalibrateMotion(sequence); result=motionPlacement;`, context);
@@ -166,8 +148,30 @@ test('avatar anchors source body and hands to the tracked face instead of center
     'global vertical origin follows the measured nose, not low signing wrists');
   assert.ok(Math.abs(context.result.centerX - .5) < 1e-12);
   assert.equal(context.result.targetY, .58, 'source nose maps to avatar nose/face center');
-  assert.match(html, /camera\.position\.set\(0,-\.18,3\.55\)/,
+  assert.match(html, /camera\.position\.set\(0,\.32,2\.05\)/,
     'the complete upper-body gesture remains in frame');
+});
+
+test('pose calibration anchors wrists to reachable avatar shoulders', () => {
+  const start = html.indexOf('function calibrateMotion(');
+  const end = html.indexOf('function midpoint(', start);
+  const frame = Array(162).fill(0);
+  frame[126] = .5; frame[127] = .2;
+  const pose = Array(18).fill(0);
+  pose[0]=.58; pose[1]=.36; pose[3]=.43; pose[4]=.36;
+  pose[12]=.54; pose[13]=.78; pose[15]=.46; pose[16]=.78;
+  const context = {
+    sequence:[frame,frame], activeBodyPose:[pose,pose], activeImageAspectRatio:16/9,
+    humanRigBones:null, result:null,
+    THREE:{MathUtils:{clamp:(value,min,max)=>Math.max(min,Math.min(max,value))}},
+  };
+  vm.runInNewContext(`${html.slice(start,end)}\ncalibrateMotion(sequence); result=motionPlacement;`,context);
+  assert.equal(context.result.centerY,.36);
+  assert.equal(context.result.targetY,.39);
+  assert.ok(Math.abs((.78-.36)*context.result.worldPerImageUnit)<.65*.88,
+    'lap-level wrists fit within the model arm reach');
+  assert.ok(context.result.horizontalScale>context.result.worldPerImageUnit,
+    'horizontal shoulder width is calibrated separately from vertical reach');
 });
 
 test('pose arms attach to the nearest anatomical hands on mirrored footage', () => {
@@ -184,8 +188,61 @@ test('pose arms attach to the nearest anatomical hands on mirrored footage', () 
   context.handWrists[1].visible = false;
   vm.runInNewContext(`${matcher}\nresult=matchPoseWristHands(poseWrists,handWrists);`, context);
   assert.deepEqual(Array.from(context.result), [1,0], 'one detected hand maps to its nearest pose wrist');
-  assert.match(html, /const wristEnd=\(poseIndex,handIndex\)=>handWrists\[handIndex\]\.visible\s*\?handWrists\[handIndex\]\.group\.group\.position\.clone\(\):point\(4\+poseIndex\)/,
-    'the forearm terminates at the exact 3-D wrist used by the hand rig');
+  assert.match(html, /const wristEnd=\(poseIndex,handIndex\)=>point\(4\+poseIndex\)\|\|/,
+    'the forearm uses the pose wrist, not the hand tracker’s unrelated depth origin');
+});
+
+test('avatar returns to an arms-down neutral stance after the final sign', () => {
+  const start = html.indexOf('function applyNeutralPose(');
+  const end = html.indexOf('function placeRigSegment(', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const neutral = html.slice(start, end);
+  assert.match(neutral, /new THREE\.Vector3\(outward\*\.16,-1,0\)/);
+  assert.match(neutral, /shoulder\.distanceTo\(elbowRest\)/,
+    'neutral arms keep the model upper-arm length');
+  assert.match(neutral, /elbowRest\.distanceTo\(wristRest\)/,
+    'neutral arms keep the model forearm length');
+  assert.match(html, /voiceMissing=\[\];\s*applyNeutralPose\(\);/,
+    'the final clip leaves the signer in neutral stance');
+});
+
+test('avatar uses measured world-space elbow depth when available', () => {
+  assert.ok(html.includes('let activeBodyPoseWorld=/*BODY_POSE_WORLD__*/null;'));
+  assert.match(html, /worldFrame=activeBodyPoseWorld\?\.\[frameIndex\]/);
+  assert.match(html, /shoulderZ-jointZ/);
+  assert.match(html, /activeBodyPoseWorld=clips\[0\]\.body_pose_world\|\|null/);
+});
+
+test('lower-torso wrist occlusion is corrected without moving the gesture in the image plane', () => {
+  const start=html.indexOf('function bodyPosePoint(');
+  const end=html.indexOf('function solveRigArm(',start);
+  const code=html.slice(start,end);
+  class Vector3 {constructor(x,y,z){this.x=x;this.y=y;this.z=z}}
+  const frame=Array(18).fill(0);
+  frame[0]=.58;frame[1]=.36;frame[3]=.43;frame[4]=.36;
+  frame[12]=.5;frame[13]=.78;frame[14]=-.1;
+  const context={
+    frame,activeBodyPoseWorld:null,frameIndex:0,humanRigBones:[{getWorldPosition:()=>({z:-.22})}],
+    motionPlacement:{centerX:.5,centerY:.36,horizontalScale:3.4,worldPerImageUnit:1.36,targetY:.39},
+    THREE:{Vector3,MathUtils:{clamp:(v,min,max)=>Math.max(min,Math.min(max,v))}},result:null,
+  };
+  vm.runInNewContext(`${code}\nresult=bodyPosePoint(frame,4,frameIndex);`,context);
+  assert.equal(context.result.x,0);
+  assert.ok(Math.abs(context.result.y-(.39-(.78-.36)*1.36))<1e-12);
+  assert.ok(context.result.z>=.069,'wrist remains visibly ahead of the lower torso');
+  frame[13]=.45;
+  vm.runInNewContext(`${code}\nresult=bodyPosePoint(frame,4,frameIndex);`,context);
+  assert.ok(context.result.z<0,'upper-body signs preserve their measured depth');
+});
+
+test('rig IK preserves bind-pose bone lengths instead of stretching the skinned arms', () => {
+  const start = html.indexOf('function placeRigSegment(');
+  const end = html.indexOf('function palmBasis(', start);
+  const segment = html.slice(start, end);
+  assert.match(segment, /humanRigRest\[childIndex\]\.position\.clone\(\)/);
+  assert.doesNotMatch(segment, /(?:bone|child)\.position\.copy\(/);
+  assert.match(segment, /bone\.quaternion\.copy\(/);
 });
 
 test('speech player sends resume for a paused motion clip instead of reloading it', () => {
@@ -203,7 +260,7 @@ test('speech player sends resume for a paused motion clip instead of reloading i
     context,
   );
   const [load, resume] = Array.from(context.result, (message) => ({...message}));
-  assert.deepEqual(load, {type:'load-motion', sequence:[[1, 2, 3]], body_pose:[[.2,.3]], image_aspect_ratio:undefined, language:'kk-KZ', label:'сәлем', fps:24});
+  assert.deepEqual(load, {type:'load-motion', sequence:[[1, 2, 3]], body_pose:[[.2,.3]], body_pose_world:null, image_aspect_ratio:undefined, language:'kk-KZ', label:'сәлем', fps:24});
   assert.deepEqual(resume, {type:'resume'});
   assert.match(html, /message\.type==='resume'[\s\S]*?paused=false/);
   assert.match(speechHtml, /event\.source !== motionFrame\.contentWindow \|\| event\.origin !== 'http:\/\/localhost:8502'/);
