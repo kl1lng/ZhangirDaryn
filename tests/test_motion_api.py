@@ -12,6 +12,20 @@ from src.motion_api import _MotionHandler
 
 
 class MotionApiLanguageTests(unittest.TestCase):
+    def test_preparation_module_is_served_as_javascript_without_template_replacement(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), _MotionHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with urlopen(f"http://127.0.0.1:{server.server_port}/rig-motion.mjs", timeout=3) as response:
+                self.assertEqual(response.headers.get_content_type(), "text/javascript")
+                self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "*")
+                self.assertEqual(response.read(), (Path(__file__).resolve().parents[1] / "web/rig-motion.mjs").read_bytes())
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=3)
+
     def test_rocketbox_glb_is_served_from_the_local_model_route(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), _MotionHandler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)

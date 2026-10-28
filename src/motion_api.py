@@ -26,6 +26,20 @@ class _MotionHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/rig-motion.mjs":
+            module_path = Path(__file__).resolve().parents[1] / "web" / "rig-motion.mjs"
+            try:
+                body = module_path.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/javascript; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError as error:
+                self._send(404, {"error": str(error)})
+            return
         if parsed.path in ("/models/rocketbox-male-adult-01.glb", "/models/rocketbox-male-adult-02.glb"):
             model_path = Path(__file__).resolve().parents[1] / "web" / "models" / parsed.path.rsplit("/", 1)[-1]
             try:

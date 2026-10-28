@@ -72,6 +72,58 @@ function measuredHand(rig,side,bend=.7){
   return{points};
 }
 
+test('wrist cannot fold backwards under an inverted palm detection',()=>{
+  for(const side of [0,1]){
+    const rig=makeRig(),pose=measuredHand(rig,side),index=side===0?2:5;
+    const hand=rig.bones[index],rest=rig.rest[index].quaternion;
+    const axis=hand.position.clone().normalize();
+    const across=new THREE.Vector3(1,0,0).cross(axis).normalize()
+      .applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()));
+    pose.points.forEach(point=>point.applyAxisAngle(across,2.6));
+    rig.context.poseNativeHand(side,pose);
+    // Compare the actual forearm and palm longitudinal axes; axial twist
+    // cannot hide an impossible backwards wrist bend.
+    const before=axis.clone().applyQuaternion(rest);
+    const after=axis.clone().applyQuaternion(hand.quaternion);
+    assert.ok(before.angleTo(after)<1.23,'wrist flexion must stay below 70 degrees');
+    rig.fingers[side].slice(1).forEach(chain=>{
+      const directions=chain.bones.slice(0,2).map((bone,i)=>chain.rest[i+1].position.clone()
+        .normalize().applyQuaternion(bone.getWorldQuaternion(new THREE.Quaternion())));
+      assert.ok(Math.abs(directions[0].angleTo(directions[1])-.7)<.025,
+        'correcting the wrist must preserve the measured finger flexion');
+    });
+  }
+});
+
+test('IK moves a wrist target out of the chest without stretching either arm',()=>{
+  for(const offset of [0,3]){
+    const {context,bones,pos}=makeRig(),shoulder=pos(bones[offset]);
+    const target=new THREE.Vector3(0,shoulder.y-.24,shoulder.z);
+    const l1=shoulder.distanceTo(pos(bones[offset+1])),l2=pos(bones[offset+1]).distanceTo(pos(bones[offset+2]));
+    context.solveRigArm(offset,offset+1,offset+2,shoulder.clone().add(new THREE.Vector3(0,-.2,.1)),target);
+    assert.ok(pos(bones[offset+2]).z>shoulder.z+.15,'wrist must be in front of the chest');
+    assert.ok(Math.abs(shoulder.distanceTo(pos(bones[offset+1]))-l1)<1e-6);
+    assert.ok(Math.abs(pos(bones[offset+1]).distanceTo(pos(bones[offset+2]))-l2)<1e-6);
+  }
+});
+
+test('local palm correction rotates the whole measured hand without counter-rotating fingers',()=>{
+  for(const side of [0,1]){
+    const a=makeRig(),b=makeRig(),handIndex=side===0?2:5;
+    a.context.poseNativeHand(side,measuredHand(a,side),0);
+    b.context.poseNativeHand(side,measuredHand(b,side),.6);
+    const correction=b.bones[handIndex].getWorldQuaternion(new THREE.Quaternion())
+      .multiply(a.bones[handIndex].getWorldQuaternion(new THREE.Quaternion()).invert());
+    assert.ok(correction.angleTo(new THREE.Quaternion())>.3);
+    for(let finger=0;finger<5;finger++){
+      const direction=rig=>rig.fingers[side][finger].rest[1].position.clone().normalize()
+        .applyQuaternion(rig.fingers[side][finger].bones[0].getWorldQuaternion(new THREE.Quaternion()));
+      assert.ok(direction(a).applyQuaternion(correction).distanceTo(direction(b))<1e-5,
+        'finger shape must rotate with the palm correction');
+    }
+  }
+});
+
 test('real Rocketbox finger hinges reproduce flexion without sideways twist or length changes',()=>{
   for(const side of [0,1]){
     const rig=makeRig(),pose=measuredHand(rig,side),hand=rig.bones[side===0?2:5];

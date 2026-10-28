@@ -13,6 +13,7 @@
     #scene{height:min(500px,62vh);min-height:360px;border-radius:22px;overflow:hidden;background:radial-gradient(circle at 50% 30%,#fff,#dbe8f6);border:1px solid #fff;position:relative}canvas{display:block;width:100%;height:100%}.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:30px;pointer-events:none}.empty[hidden]{display:none}
     .controls{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}.controls button{border:1px solid #d2d2d7;background:#fff;color:var(--ink);border-radius:999px;padding:11px 16px;cursor:pointer;font-weight:600}.controls button.primary{background:var(--blue);border-color:var(--blue);color:#fff}.controls button:hover{transform:translateY(-1px)}.caption{margin-top:16px;background:#f5f5f7;border:1px solid #d2d2d7;border-radius:14px;padding:14px 16px;color:var(--muted)}
     .timeline{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px;color:var(--muted);font-size:13px}.timeline input{flex:1;min-width:120px;accent-color:var(--blue)}.timeline select{border:1px solid #d2d2d7;border-radius:9px;padding:6px;background:#fff;color:var(--ink)}.timeline output{min-width:74px;font-variant-numeric:tabular-nums}
+    .preparation{margin-top:14px;border:1px solid #d2d2d7;border-radius:14px;padding:14px;font-size:14px}.preparation summary{cursor:pointer;font-weight:600}.preparation p{color:var(--muted);line-height:1.5}.edit-grid{display:flex;gap:12px;flex-wrap:wrap}.edit-grid label{display:grid;gap:5px;flex:1;min-width:125px}.edit-grid input,.edit-grid select{width:100%;box-sizing:border-box;padding:8px;border:1px solid #d2d2d7;border-radius:8px;background:white}.preparation button:disabled{opacity:.45;cursor:default}#preparation-status{margin-bottom:0;font-variant-numeric:tabular-nums}
   </style>
 </head>
 <body>
@@ -22,10 +23,29 @@
   <div class="controls"><button class="primary" onclick="playMotion()">▶ Воспроизвести</button><button onclick="startVoice()">● Сказать фразу</button><button onclick="toggle()">Ⅱ Пауза</button><button onclick="resetView()">↺ Сбросить вид</button></div>
   <div class="timeline"><input id="motion-progress" aria-label="Позиция анимации" type="range" min="0" max="1" step="0.01" value="0"><output id="motion-time">0.0 / 0.0 с</output><label>Скорость <select id="motion-speed"><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select></label></div>
   <div id="caption" class="caption">Ожидание клипа.</div>
+  <details class="preparation" id="preparation-panel">
+    <summary>Подготовка и проверка движения</summary>
+    <p id="preparation-status" role="status">Выберите клип с дорожкой плеч и локтей.</p>
+    <p>Приостановите жест и найдите проблемный участок ползунком. Укажите диапазон кадров и поправку. Исходное видео и точки сохраняются без изменений.</p>
+    <fieldset id="motion-editor" disabled style="border:0;padding:0;margin:0">
+      <div class="edit-grid">
+        <label>Рука аватара<select id="edit-side"><option value="0">Левая</option><option value="1">Правая</option></select></label>
+        <label>С кадра (от 0)<input id="edit-from" type="number" min="0" step="1" value="0"></label>
+        <label>По кадр включительно<input id="edit-to" type="number" min="0" step="1" value="0"></label>
+        <label>Кисть вперёд, см<input id="edit-depth" type="number" min="-10" max="15" step="1" value="0"></label>
+        <label>Поворот ладони, °<input id="edit-roll" type="number" min="-45" max="45" step="1" value="0"></label>
+      </div>
+      <p><label><input id="edit-contact" type="checkbox"> Разрешить касание корпуса на этом участке</label></p>
+      <div class="controls"><button id="apply-edit">Применить поправку</button><button id="undo-edit">Отменить последнюю</button><button id="review-motion">Отметить: просмотрено мной</button><button id="export-motion">Скачать анимацию</button></div>
+    </fieldset>
+    <p>Подготовленная анимация и поправки сохраняются в этом браузере. Отметка просмотра не подтверждает правильность КЖЯ; её должен оценить носитель языка.</p>
+  </details>
 </main>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+import {bakeRigMotion,applyPreparedFrame,isPreparedMotion,motionFingerprint,createMotionRepository,correctionAt,RIG_MOTION_VERSION} from 'http://127.0.0.1:8502/rig-motion.mjs';
+const motionRepository=createMotionRepository();
 let activeSequence=__MOTION_SEQUENCE__;
 let activeLabel=__MOTION_LABEL__;
 let activeFps=__MOTION_FPS__;
@@ -34,6 +54,10 @@ let activeBodyPose=/*BODY_POSE__*/null;
 let activeBodyPoseWorld=/*BODY_POSE_WORLD__*/null;
 let activeLanguage=/*MOTION_LANGUAGE__*/"kk-KZ";
 let initialQueue=/*MOTION_QUEUE__*/[];
+let preparedMotion=null,preparedKey=null,preparedRecord=null,preparing=false,humanLoadFailed=false,preparationRequest=0;
+let loadedRigSignature=null;
+let activeCorrections=[],rigFrameCorrections=[{depth:0,roll:0,contact:false},{depth:0,roll:0,contact:false}];
+let preparationStorage='';
 let initialMissing=/*MOTION_MISSING__*/[];
 const THREE_SCENE=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(36,1,.01,100);camera.position.set(0,.32,2.05);camera.lookAt(0,.32,0);
@@ -93,19 +117,21 @@ avatarLoader.load('http://127.0.0.1:8502/models/rocketbox-male-adult-02.glb',glt
   }));
   humanAvatar.updateMatrixWorld(true);
   calibrateFingerJoints();
-  if(activeSequence.length)calibrateMotion(activeSequence);
+  loadedRigSignature=rigPoseBones().map(bone=>[bone.name,bone.position.toArray(),bone.quaternion.toArray(),bone.scale.toArray()]);
   frameCamera();
   if(activeBodyPose){
     handL.group.visible=false;handR.group.visible=false;
-    if(playTimer===null&&frameIndex>=activeSequence.length)applyNeutralPose();
-    else if(playTimer!==null)renderFrame();
+    applyNeutralPose();
   }
   torso.visible=false;neck.visible=false;head.visible=false;face.visible=false;
   staticMouth.visible=false;liveMouth.visible=false;mouthCavity.visible=false;browLines.forEach(line=>line.visible=false);
   document.querySelector('.live').textContent='● 3D HUMAN · MOTION DB';
+  if(activeSequence.length)playMotion();
 },undefined,error=>{
+  humanLoadFailed=true;
   console.error('DosYm human avatar failed to load',error);
   document.querySelector('#caption').textContent=`Не удалось загрузить 3D-модель человека (${error?.message||'ошибка сети'}); используется резервный аватар.`;
+  if(activeSequence.length)playMotion();
 });
 // One hand contains a skinned-looking palm plate, 21 joints and 20 tapered phalanges.
 const LINKS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20]];
@@ -176,7 +202,7 @@ function matchPoseWristHands(poseWrists,handWrists,previous=null){
 }
 function applyBodyPose(index,frame=activeBodyPose?.[index],source=activeSequence[index],worldFrame=activeBodyPoseWorld?.[index]){
   if(!Array.isArray(frame)||frame.length!==18){limbs.forEach(limb=>limb.visible=false);return}
-  const point=i=>bodyPosePoint(frame,i,index,worldFrame);
+  const point=i=>bodyPosePoint(frame,i,index,worldFrame,i>=4&&rigFrameCorrections[i-4].contact);
   const ls=point(0),rs=point(1),le=point(2),re=point(3);
   // Tasks handedness labels can be reversed on mirrored source footage. Match
   // Pose wrists to actual hand wrists per frame instead of assuming label parity.
@@ -192,20 +218,22 @@ function applyBodyPose(index,frame=activeBodyPose?.[index],source=activeSequence
   const wristEnd=(poseIndex,handIndex)=>point(4+poseIndex)||
       (handWrists[handIndex].visible?handWrists[handIndex].group.group.position.clone():null);
   const lw=wristEnd(0,leftHandIndex),rw=wristEnd(1,rightHandIndex);
+  if(lw)lw.z+=rigFrameCorrections[0].depth;
+  if(rw)rw.z+=rigFrameCorrections[1].depth;
   if(humanAvatar&&humanRigBones){
     limbs.forEach(limb=>limb.visible=false);
     humanRigBones.forEach((bone,i)=>{bone.position.copy(humanRigRest[i].position);bone.quaternion.copy(humanRigRest[i].quaternion)});
     humanAvatar.updateMatrixWorld(true);
-    if(le&&lw)solveRigArm(0,1,2,le,lw);
-    if(re&&rw)solveRigArm(3,4,5,re,rw);
-    if(handWrists[leftHandIndex].visible)poseNativeHand(0,handWrists[leftHandIndex].group.pose);
-    if(handWrists[rightHandIndex].visible)poseNativeHand(1,handWrists[rightHandIndex].group.pose);
+    if(le&&lw)solveRigArm(0,1,2,le,lw,rigFrameCorrections[0].contact);
+    if(re&&rw)solveRigArm(3,4,5,re,rw,rigFrameCorrections[1].contact);
+    if(handWrists[leftHandIndex].visible)poseNativeHand(0,handWrists[leftHandIndex].group.pose,rigFrameCorrections[0].roll);
+    if(handWrists[rightHandIndex].visible)poseNativeHand(1,handWrists[rightHandIndex].group.pose,rigFrameCorrections[1].roll);
   }else{
     if(ls&&le&&lw){setLimb(limbs[0],ls,le,.065);setLimb(limbs[1],le,lw,.047)}else{limbs[0].visible=false;limbs[1].visible=false}
     if(rs&&re&&rw){setLimb(limbs[2],rs,re,.065);setLimb(limbs[3],re,rw,.047)}else{limbs[2].visible=false;limbs[3].visible=false}
   }
 }
-function bodyPosePoint(frame,index,frameIndex,worldFrame=activeBodyPoseWorld?.[frameIndex]){
+function bodyPosePoint(frame,index,frameIndex,worldFrame=activeBodyPoseWorld?.[frameIndex],allowContact=false){
   const x=Number(frame[index*3]),y=Number(frame[index*3+1]),z=Number(frame[index*3+2]);
   if(!Number.isFinite(x+y+z)||(!x&&!y&&!z))return null;
   const shoulderDepth=humanRigBones?.[index%2===0?0:3]?.getWorldPosition(new THREE.Vector3()).z??.12;
@@ -225,7 +253,7 @@ function bodyPosePoint(frame,index,frameIndex,worldFrame=activeBodyPoseWorld?.[f
   }
   const worldX=(x-motionPlacement.centerX)*motionPlacement.horizontalScale;
   const worldY=motionPlacement.targetY-(y-motionPlacement.centerY)*motionPlacement.worldPerImageUnit;
-  if(index>=4){
+  if(index>=4&&!allowContact){
     // A seated signer's hands can be in front of their lap while a standing
     // avatar's same shoulder-relative depth places them inside its shirt.
     // Only lift wrists toward the camera where they overlap the lower torso;
@@ -236,9 +264,21 @@ function bodyPosePoint(frame,index,frameIndex,worldFrame=activeBodyPoseWorld?.[f
   }
   return new THREE.Vector3(worldX,worldY,depth)
 }
-function solveRigArm(upperIndex,foreIndex,handIndex,elbowHint,wristTarget){
+function solveRigArm(upperIndex,foreIndex,handIndex,elbowHint,wristTarget,allowContact=false){
   const upper=humanRigBones[upperIndex],fore=humanRigBones[foreIndex],hand=humanRigBones[handIndex];
   const shoulder=upper.getWorldPosition(new THREE.Vector3());
+  // A conservative front envelope for the shirt. Correct the target before
+  // IK so protection never translates bones or stretches the skinned mesh.
+  wristTarget=wristTarget.clone();
+  const otherShoulder=humanRigBones[upperIndex===0?3:0].getWorldPosition(new THREE.Vector3());
+  const centerX=(shoulder.x+otherShoulder.x)/2;
+  const halfWidth=Math.abs(shoulder.x-otherShoulder.x)*.5;
+  const torsoY=(shoulder.y+otherShoulder.y)/2;
+  const nx=(wristTarget.x-centerX)/Math.max(.18,halfWidth);
+  if(!allowContact&&Math.abs(nx)<1&&wristTarget.y<torsoY-.06&&wristTarget.y>torsoY-.72){
+    const front=(shoulder.z+otherShoulder.z)/2+.19*Math.sqrt(1-nx*nx);
+    wristTarget.z=Math.max(wristTarget.z,front);
+  }
   const naturalElbow=fore.getWorldPosition(new THREE.Vector3());
   const naturalWrist=hand.getWorldPosition(new THREE.Vector3());
   const upperLength=shoulder.distanceTo(naturalElbow),foreLength=naturalElbow.distanceTo(naturalWrist);
@@ -331,7 +371,7 @@ function calibrateFingerJoints(){
     });
   });
 }
-function poseNativeHand(side,pose){
+function poseNativeHand(side,pose,roll=0){
   if(!pose||!humanRigFingers)return;
   const hand=humanRigBones[side===0?2:5],chains=humanRigFingers[side];
   const points=pose.points.map(point=>new THREE.Vector3(point.x,point.y,point.z));
@@ -342,7 +382,9 @@ function poseNativeHand(side,pose){
   if(Math.min(restAcross.lengthSq(),restLong.lengthSq(),targetAcross.lengthSq(),targetLong.lengthSq())<1e-8)return;
   const restBasis=palmBasis(restAcross,restLong),targetBasis=palmBasis(targetAcross,targetLong);
   if(!restBasis||!targetBasis)return;
-  const targetWorld=targetBasis.multiply(restBasis.invert()).normalize();
+  const measuredPalm=targetBasis.multiply(restBasis.invert()).normalize();
+  const targetWorld=measuredPalm.clone();
+  if(roll)targetWorld.multiply(new THREE.Quaternion().setFromAxisAngle(restLong.clone().normalize(),roll));
   const forearm=hand.parent,parentRotation=forearm.getWorldQuaternion(new THREE.Quaternion());
   const local=parentRotation.clone().invert().multiply(targetWorld);
   const delta=local.clone().multiply(humanRigRest[side===0?2:5].quaternion.clone().invert()).normalize();
@@ -356,7 +398,25 @@ function poseNativeHand(side,pose){
   forearm.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axis,THREE.MathUtils.clamp(twist*.45,-1.2,1.2)));
   forearm.updateMatrixWorld(true);
   hand.quaternion.copy(forearm.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(targetWorld)).normalize();
+  // Separate axial rotation from flexion. Clamping the complete quaternion
+  // would incorrectly suppress pronation along with a backwards wrist bend.
+  const wristRest=humanRigRest[side===0?2:5].quaternion;
+  const wristDelta=wristRest.clone().invert().multiply(hand.quaternion).normalize();
+  const projection=axis.x*wristDelta.x+axis.y*wristDelta.y+axis.z*wristDelta.z;
+  const wristTwist=new THREE.Quaternion(axis.x*projection,axis.y*projection,axis.z*projection,wristDelta.w);
+  if(wristTwist.lengthSq()<1e-8)wristTwist.identity();else wristTwist.normalize();
+  const wristSwing=wristDelta.clone().multiply(wristTwist.clone().invert()).normalize();
+  if(wristSwing.w<0)wristSwing.set(-wristSwing.x,-wristSwing.y,-wristSwing.z,-wristSwing.w);
+  const swingAngle=2*Math.acos(THREE.MathUtils.clamp(wristSwing.w,-1,1));
+  const maxWristBend=70*Math.PI/180;
+  if(swingAngle>maxWristBend)wristSwing.slerp(new THREE.Quaternion(),1-maxWristBend/swingAngle);
+  hand.quaternion.copy(wristRest).multiply(wristSwing).multiply(wristTwist).normalize();
   hand.updateMatrixWorld(true);
+  // Finger vectors must follow the corrected palm, including a constrained
+  // wrist. Otherwise proximal joints counter-rotate and deform the hand.
+  const handCorrection=hand.getWorldQuaternion(new THREE.Quaternion()).multiply(measuredPalm.clone().invert());
+  points.forEach(point=>point.applyQuaternion(handCorrection));
+  targetAcross.applyQuaternion(handCorrection);targetLong.applyQuaternion(handCorrection);
   chains.forEach((chain,finger)=>{
     const ids=FINGERS[finger];
     chain.bones.forEach((bone,segment)=>{
@@ -692,6 +752,11 @@ function presentMotionSample(position){
   const frame=sampleMotionTrack(motionTracks.sequence,position);if(!frame)return;
   frameIndex=Math.min(activeSequence.length,Math.floor(position)+1);
   applyFacialMotion(frame);
+  if(preparedMotion){applyPreparedFrame(preparedMotion,rigPoseBones(),position);humanAvatar.updateMatrixWorld(true);return}
+  solveSourceFrame(position,frame);
+}
+function solveSourceFrame(position,frame=sampleMotionTrack(motionTracks.sequence,position)){
+  if(!frame)return;
   applyHand(frame,0,handL,-1);applyHand(frame,63,handR,1);
   applyBodyPose(Math.floor(position),sampleMotionTrack(motionTracks.pose,position),frame,sampleMotionTrack(motionTracks.world,position));
 }
@@ -757,24 +822,140 @@ function advanceMotion(now){
   if(!paused)renderFrame();
   if(playTimer!==null&&generation===playbackGeneration)playTimer=requestAnimationFrame(advanceMotion);
 }
-function playMotion(){
-  if(!activeSequence.length){document.querySelector('#caption').textContent='Для этой фразы нет сохранённого видео жеста.';return}
+function playMotion(options={}){
+  const request=++preparationRequest;
+  return startPreparedPlayback(options).catch(error=>{
+    if(request!==preparationRequest)return;
+    preparing=false;stopMotion();
+    document.querySelector('#caption').textContent=`Не удалось подготовить движение: ${error.message}`;
+    document.querySelector('#preparation-status').textContent='Подготовка не завершена. Исходные данные не изменены.';
+  });
+}
+async function startPreparedPlayback(options){
   stopMotion();
+  const generation=playbackGeneration;
+  preparedMotion=null;preparedRecord=null;preparedKey=null;preparing=false;
+  document.querySelector('#motion-editor').disabled=true;
+  if(!activeSequence.length){
+    document.querySelector('#caption').textContent='Для этой фразы нет сохранённого видео жеста.';
+    document.querySelector('#preparation-status').textContent='Нет клипа для подготовки.';return;
+  }
+  preparing=true;
+  document.querySelector('#caption').textContent='Подготавливаю движение…';
+  if(!humanRigBones&&!humanLoadFailed){document.querySelector('#preparation-status').textContent='Загружаю модель аватара…';return}
   motionTracks={sequence:stabilizeHandTrack(interpolateShortHandGaps(activeSequence),activeFps),pose:stabilizeMotionTrack(activeBodyPose,activeFps),world:stabilizeMotionTrack(activeBodyPoseWorld,activeFps)};
+  if(humanRigBones)applyNeutralPose();
   activeMotionFrameCount=activeSequence.length;calibrateMotion(activeSequence);
+  if(humanRigBones&&activeBodyPose){
+    await prepareRigPlayback(generation,Boolean(options.rebuild));
+    if(generation!==playbackGeneration)return;
+  }else{
+    document.querySelector('#preparation-status').textContent='Для подготовки полного аватара нужны видимые плечи и локти в исходном видео.';
+  }
+  preparing=false;
   openingPose=null;openingRestEnd=findOpeningRestEnd(activeSequence,activeBodyPose,activeFps);
   closingRestStart=findClosingRestStart(activeSequence,activeBodyPose,activeFps);
   if(closingRestStart!==null&&closingRestStart<=openingRestEnd+activeFps*.56)closingRestStart=null;
   handL.group.visible=false;handR.group.visible=false;handL.tracked=false;handR.tracked=false;handL.pose=null;handR.pose=null;
   lastHandAssignment=null;previousArmPole=[null,null];previousWristTwist=[null,null];frameIndex=0;playbackElapsed=0;neutralTransition=null;paused=false;
+  if(Number.isFinite(options.seek)){playbackElapsed=options.seek/activeFps;paused=Boolean(options.pause)}
   document.querySelector('#empty').hidden=true;document.querySelector('#motion-progress').max=Math.max(0,activeSequence.length-1);
   renderFrame();playTimer=requestAnimationFrame(advanceMotion);
   const missingNote=voiceMissing.length?` · нет клипов: ${voiceMissing.join(', ')}`:'';
   const poseNote=activeBodyPose?'':' · в клипе нет плеч/локтей — показаны только кисти';
-  document.querySelector('#caption').textContent=`Воспроизведение из motion-базы: ${activeLabel} · ${activeMotionFrameCount} кадров${missingNote}${poseNote}`;
+  document.querySelector('#caption').textContent=`${options.pause?'Пауза после подготовки':'Воспроизведение из motion-базы'}: ${activeLabel} · ${activeMotionFrameCount} кадров${missingNote}${poseNote}`;
 }
+
+async function prepareRigPlayback(generation,rebuild){
+  const bones=rigPoseBones();
+  const key=await motionFingerprint({sequence:activeSequence,pose:activeBodyPose,world:activeBodyPoseWorld,
+    fps:activeFps,aspect:activeImageAspectRatio,rig:loadedRigSignature});
+  if(generation!==playbackGeneration)return;
+  preparedKey=key;preparationStorage='';
+  let cached=null;
+  if(!rebuild){
+    const loaded=await motionRepository.get(key);cached=loaded.record;
+    preparationStorage=loaded.persisted?(loaded.source==='browser'?'Загружено из браузера.':'Сохранено в браузере.'):'Результат только в этой вкладке.';
+    if(generation!==playbackGeneration)return;
+    activeCorrections=Array.isArray(cached?.edits)?cached.edits.map(edit=>({...edit})):[];
+  }
+  if(!rebuild&&isPreparedMotion(cached?.data,bones,activeSequence.length,activeFps)){
+    preparedRecord=cached;preparedMotion=cached.data;
+  }else{
+    applyNeutralPose();lastHandAssignment=null;previousArmPole=[null,null];previousWristTwist=[null,null];
+    const groups=[[0,1],[3,4],[2,...Array.from({length:15},(_,i)=>6+i)],[5,...Array.from({length:15},(_,i)=>21+i)]];
+    const data=bakeRigMotion({bones,frameCount:activeSequence.length,fps:activeFps,groups,
+      solveFrame:frame=>{
+        rigFrameCorrections=[0,1].map(side=>correctionAt(activeCorrections,frame,side,activeFps));
+        applyNeutralPose();solveSourceFrame(frame);
+      },
+      tracked:frame=>{
+        const pose=motionTracks.pose?.[frame];
+        const arms=[0,1].map(side=>{
+          const slots=side===0?[0,2,4]:[1,3,5];
+          return Array.isArray(pose)&&slots.every(j=>pose.slice(j*3,j*3+3).some(n=>n!==0));
+        });
+        if(!Array.isArray(pose))return [...arms,false,false];
+        const source=motionTracks.sequence[frame];
+        const wrists=[0,63].map((offset,i)=>({x:source[offset],y:source[offset+1],visible:i===0?handL.tracked:handR.tracked}));
+        const mapping=matchPoseWristHands([4,5].map(i=>({x:pose[i*3],y:pose[i*3+1]})),wrists,lastHandAssignment);
+        return [...arms,...mapping.map(i=>wrists[i].visible)];
+      },
+    });
+    rigFrameCorrections=[{depth:0,roll:0,contact:false},{depth:0,roll:0,contact:false}];
+    preparedMotion=data;preparedRecord={data,edits:activeCorrections.map(e=>({...e})),reviewed:false,createdAt:new Date().toISOString()};
+    const persisted=await motionRepository.put(key,preparedRecord);
+    preparationStorage=persisted?'Сохранено в браузере.':'Не удалось сохранить — результат только в этой вкладке.';
+    if(generation!==playbackGeneration)return;
+  }
+  document.querySelector('#edit-from').max=activeSequence.length-1;
+  document.querySelector('#edit-to').max=activeSequence.length-1;
+  if(!rebuild){document.querySelector('#edit-to').value=activeSequence.length-1;document.querySelector('#edit-from').value=0}
+  document.querySelector('#motion-editor').disabled=false;
+  updatePreparationStatus();
+}
+function updatePreparationStatus(){
+  if(!preparedRecord)return;
+  const q=preparedRecord.data.quality,missing=q.missingFrames||[0,0];
+  document.querySelector('#preparation-status').textContent=
+    `${preparedRecord.reviewed?'Просмотрено пользователем':'Подготовлено · требуется просмотр'} · ${activeSequence.length} кадров. `+
+    `Пропуски позы: левая ${missing[0]||0}, правая ${missing[1]||0}. Ограничено скачков костей: ${q.limitedRotations}. `+
+    `Пропуски кистей: левая ${missing[2]||0}, правая ${missing[3]||0}. `+
+    `Поправок: ${preparedRecord.edits.length}. ${preparationStorage}`;
+}
+document.querySelector('#apply-edit').addEventListener('click',()=>{
+  if(preparing||!preparedRecord)return;
+  const from=Number(document.querySelector('#edit-from').value),to=Number(document.querySelector('#edit-to').value);
+  const depth=Number(document.querySelector('#edit-depth').value),roll=Number(document.querySelector('#edit-roll').value);
+  if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<from||to>=activeSequence.length||
+    !Number.isFinite(depth)||depth< -10||depth>15||!Number.isFinite(roll)||Math.abs(roll)>45){
+    document.querySelector('#preparation-status').textContent='Проверьте диапазон кадров и допустимые значения поправок.';return;
+  }
+  activeCorrections.push({from,to,side:Number(document.querySelector('#edit-side').value),depth:depth/100,
+    roll:roll*Math.PI/180,contact:document.querySelector('#edit-contact').checked});
+  playMotion({rebuild:true,seek:Math.min(to,Math.max(from,playbackElapsed*activeFps)),pause:true});
+});
+document.querySelector('#undo-edit').addEventListener('click',()=>{
+  if(preparing||!preparedRecord||!activeCorrections.length)return;
+  activeCorrections.pop();playMotion({rebuild:true,seek:playbackElapsed*activeFps,pause:true});
+});
+document.querySelector('#review-motion').addEventListener('click',async()=>{
+  if(preparing||!preparedRecord)return;
+  const key=preparedKey,record={...preparedRecord,reviewed:!preparedRecord.reviewed};
+  preparedRecord=record;updatePreparationStatus();
+  const persisted=await motionRepository.put(key,record);
+  if(preparedKey===key){preparationStorage=persisted?'Сохранено в браузере.':'Отметка сохранена только в этой вкладке.';updatePreparationStatus()}
+});
+document.querySelector('#export-motion').addEventListener('click',()=>{
+  if(!preparedRecord)return;
+  const payload={...preparedRecord,label:activeLabel,sourceKey:preparedKey,pipeline:RIG_MOTION_VERSION,
+    data:{...preparedRecord.data,rotations:Array.from(preparedRecord.data.rotations)}};
+  const url=URL.createObjectURL(new Blob([JSON.stringify(payload)],{type:'application/json'}));
+  const a=document.createElement('a');a.href=url;a.download=`dosym-motion-${preparedKey.slice(0,12)}.json`;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
 document.querySelector('#motion-progress').addEventListener('input',event=>{
-  if(!activeSequence.length)return;
+  if(!activeSequence.length||preparing)return;
   if(!motionTracks)playMotion();
   paused=true;lastPlaybackTime=null;neutralTransition=null;previousArmPole=[null,null];previousWristTwist=[null,null];
   playbackElapsed=Number(event.target.value)/Math.max(1,activeFps);renderFrame();
@@ -810,7 +991,7 @@ function startVoice(){
   recognition.onerror=event=>document.querySelector('#caption').textContent=`Не удалось распознать голос: ${event.error}`;
   recognition.start();document.querySelector('#caption').textContent='Слушаю казахскую фразу…'
 }
-function toggle(){if(playTimer===null){playMotion();return}paused=!paused;lastPlaybackTime=null;document.querySelector('#caption').textContent=paused?'Воспроизведение приостановлено.':'Воспроизведение продолжается.'}
+function toggle(){if(preparing)return;if(playTimer===null){playMotion();return}paused=!paused;lastPlaybackTime=null;document.querySelector('#caption').textContent=paused?'Воспроизведение приостановлено.':'Воспроизведение продолжается.'}
 function resetView(){frameCamera()}
 window.addEventListener('message',event=>{
   if(event.source!==window.parent||!event.data||typeof event.data!=='object')return;

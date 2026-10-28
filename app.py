@@ -1593,5 +1593,5 @@ with tab_avatar:
             ensure_motion_api()
         except OSError as api_error:
             st.warning(f"Локальный API motion-клипов не запустился: {api_error}")
-        components.html(avatar_html, height=760, scrolling=False)
+        components.html(avatar_html, height=900, scrolling=True)
 

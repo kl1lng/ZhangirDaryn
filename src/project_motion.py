@@ -96,7 +96,7 @@ def prepare_project_videos(project_dir: str | Path, label: str, videos, settings
             elif float(metadata.get("body_pose_coverage") or 0) < .5:
                 row.update(status="hands_only", message="Кисти доступны; для полного аватара нужно видео с видимыми плечами и локтями и установленная Pose-модель.")
             else:
-                row.update(status="ready", message="Готово: жест доступен в переводе текста и аватаре.")
+                row.update(status="ready", message="Точки извлечены; доступен предварительный просмотр. Откройте аватар для подготовки и визуальной проверки движения.")
         except Exception as error:
             row.update(status="error", message=f"{type(error).__name__}: {error}")
         report[path.name] = row
