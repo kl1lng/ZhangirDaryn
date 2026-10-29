@@ -50,6 +50,7 @@ For Erke
 !.env.*.example
 .next/
 .next-performance/
+.next-camera-test/
 playwright-report/
 test-results/
 .superpowers/
@@ -57,6 +58,7 @@ test-results/
 .venv-pwa/
 .venv-train/
 /pwa/public/avatar/
+/pwa/public/camera/
 /pwa/public/offline-locales.js
 # The Python virtual-environment rule `lib/` must not hide PWA source modules.
 !pwa/lib/

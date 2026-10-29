@@ -19,6 +19,7 @@ const Upload=dynamic(()=>import('./uploads').then(module=>module.Upload),{loadin
 const Materials=dynamic(()=>import('./materials').then(module=>module.Materials),{loading:RouteLoading});
 const Material=dynamic(()=>import('./materials').then(module=>module.Material),{loading:RouteLoading});
 const Training=dynamic(()=>import('./materials').then(module=>module.Training),{loading:RouteLoading});
+const Camera=dynamic(()=>import('./camera').then(module=>module.Camera),{loading:RouteLoading});
 
 export function Workspace(){return <LocaleProvider><WorkspaceContent/></LocaleProvider>;}
 function WorkspaceContent(){const {t}=useI18n();return <Suspense fallback={<p>{t("Открываем DosYm…")}</p>}><AuthProvider><OfflineProvider><Shell/></OfflineProvider></AuthProvider></Suspense>;}
@@ -26,9 +27,10 @@ function Shell(){const {t}=useI18n();
  const path=usePathname(),{user,loading}=useAuth();
  const [online,setOnline]=useState(true);
  useEffect(()=>{setOnline(navigator.onLine);const fn=()=>setOnline(navigator.onLine);window.addEventListener('online',fn);window.addEventListener('offline',fn);return()=>{window.removeEventListener('online',fn);window.removeEventListener('offline',fn);};},[]);
- const navigation=[['/','translate',t("Перевод")],['/dictionary','book',t("Словарь")],['/upload','add',t("Добавить видео")],['/my','folder',t("Мои материалы")]];
+ const navigation=[['/','translate',t("Перевод")],['/camera','camera',t('Камера')],['/dictionary','book',t("Словарь")],['/upload','add',t("Добавить видео")],['/my','folder',t("Мои материалы")]];
  let content:React.ReactNode;
  if(path==='/')content=<Translate/>;
+ else if(path==='/camera')content=<Camera/>;
  else if(path==='/dictionary')content=<Dictionary/>;
  else if(path.startsWith('/gestures/'))content=<GestureDetail id={path.split('/')[2]}/>;
  else if(path==='/login')content=<Login/>;

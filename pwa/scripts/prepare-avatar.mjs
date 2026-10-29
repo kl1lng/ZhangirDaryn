@@ -2,6 +2,7 @@
 import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import './prepare-locales.mjs';
+import './prepare-camera.mjs';
 const root=path.resolve(import.meta.dirname,'../..');
 const output=path.join(root,'pwa/public/avatar');
 await mkdir(path.join(output,'models'),{recursive:true});

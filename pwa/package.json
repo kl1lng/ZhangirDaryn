@@ -13,6 +13,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts && playwright test"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.32",
     "@supabase/supabase-js": "2.118.0",
     "next": "16.4.3",
     "react": "19.3.1",

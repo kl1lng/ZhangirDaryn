@@ -5,6 +5,7 @@ import re
 import sqlite3
 from contextlib import closing
 from pathlib import Path
+import numpy as np
 
 from backend.import_motion import PUBLIC_METADATA
 from backend.store import Store
@@ -16,6 +17,7 @@ def export_library(source, destination):
         raise FileExistsError('Choose an empty destination for a new library snapshot.')
     catalog=[]
     files={}
+    camera=[]
     with closing(sqlite3.connect(Path(source).resolve().as_uri()+'?mode=ro',uri=True)) as db:
         db.row_factory=sqlite3.Row
         rows=db.execute('''SELECT s.id,s.label,s.language,a.payload,a.checksum,a.metadata
@@ -36,7 +38,11 @@ def export_library(source, destination):
             files[row['id']+'.json']=json.dumps(motion,ensure_ascii=False,allow_nan=False,separators=(',',':'))
             catalog.append({'id':row['id'],'label':row['label'],'language':row['language'],
                             'metadata':{'fps':metadata['fps'],'shape':list(array.shape)},'version':row['checksum']})
+            positions=np.linspace(0,len(array)-1,16)
+            sample=np.stack([np.interp(positions,np.arange(len(array)),array[:,axis]) for axis in range(126)],axis=1)
+            camera.append({'id':row['id'],'label':row['label'],'sequence':sample.round(6).tolist()})
     files['catalog.json']=json.dumps(catalog,ensure_ascii=False,allow_nan=False,separators=(',',':'))
+    files['camera.json']=json.dumps({'schema':1,'references':camera},ensure_ascii=False,allow_nan=False,separators=(',',':'))
     destination.mkdir(parents=True,exist_ok=True)
     for name,content in files.items():
         (destination/name).write_text(content,encoding='utf-8')

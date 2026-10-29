@@ -34,6 +34,9 @@ class PublicLibraryExportTests(unittest.TestCase):
             motion=json.loads((root/'export'/f"{ready['id']}.json").read_text(encoding='utf-8'))
             self.assertEqual(motion['sequence'],clip['sequence'].tolist())
             self.assertNotIn('body_pose_landmarks',catalog[0]['metadata'])
+            camera=json.loads((root/'export/camera.json').read_text(encoding='utf-8'))
+            self.assertEqual(len(camera['references']),1)
+            self.assertEqual(np.shape(camera['references'][0]['sequence']),(16,126))
             text=json.dumps(motion)
             for private in ['private-person','private.mp4','private@example.invalid','Private name']:
                 self.assertNotIn(private,text)
