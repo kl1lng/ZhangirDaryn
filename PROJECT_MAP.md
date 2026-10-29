@@ -68,8 +68,11 @@ PWA-прогресс: `docs/PWA_PROGRESS.md`. Спецификация и пла
   словарь, адаптивные экраны и offline-оболочка реализованы. Запуск и
   ограничения — в `pwa/README.md` и `docs/PWA_PROGRESS.md`.
 - Google OAuth web client создан; локальный browser sign-in проверен, назначилась серверная роль модератора.
-  Drive API, PostgreSQL hosting/backup, Vercel deploy, device install QA и
-  публикация/rollback модели не подключены.
+  PWA размещена на Vercel (`dosym-seven.vercel.app`), параметры Supabase и callback настроены.
+  `pwa/app/api/[...path]/route.ts` поддерживает проверку Supabase-сессии без ML backend,
+  только с ролью участника; `pwa/tests/hosted-auth.test.ts` проверяет эту границу доступа.
+  Сквозной облачный OAuth, Drive storage, размещение Python backend, backup,
+  device install QA и публикация/rollback модели ещё требуют завершения и проверки.
 - Пользовательский Streamlit остаётся инструментом автора.
 
 Полной проверки столкновений кистей, пальцев и предплечий с телом нет.
