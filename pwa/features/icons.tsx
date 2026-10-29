@@ -8,6 +8,7 @@ export function Icon({name,size=22}:{name:string;size?:number}){
   settings:<><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></>,
   play:<path d="m9 5 11 7-11 7z"/>,pause:<><path d="M8 5v14M16 5v14"/></>,
   search:<><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></>,
+  mic:<><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></>,
   upload:<><path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6"/></>,
   arrow:<><path d="M4 12h15m-5-5 5 5-5 5"/></>,
   check:<path d="m5 12 4 4L19 6"/>,

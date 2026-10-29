@@ -41,6 +41,7 @@ PWA-прогресс: `docs/PWA_PROGRESS.md`. Спецификация и пла
 - `docs/superpowers/plans/2026-10-29-dosym-performance.md` — план
   оптимизации, статус выполненных этапов и дальнейшие измерения.
 - `pwa/features/locale.tsx`, `pwa/lib/messages.json`, `pwa/lib/i18n.ts` — казахский интерфейс по умолчанию, русский/английский и сохранение выбора; офлайн-словарь генерируется `pwa/scripts/prepare-locales.mjs`.
+- `pwa/features/speech.tsx` — голосовой ввод через браузерный Web Speech API с выбором языка, промежуточным текстом, обработкой отказа и остановкой при уходе/скрытии страницы; `pwa/tests/speech.spec.ts` проверяет сценарии с имитацией браузерного API.
 - `pwa/lib/gesture-search.ts` — общее сопоставление кириллицы/латиницы для текущих и будущих меток; правила и источники — `docs/LOCALES_AND_SEARCH.md`.
 - `scripts/start-pwa.ps1`, `scripts/stop-pwa.ps1` — управление локальными PWA процессами на loopback.
 - `docs/DEPLOYMENT.md`, `docs/DATA_RETENTION.md`, `docs/PWA_TECH_SPIKE.md`, `docs/PWA_ACCEPTANCE.md` — архитектура, хранение, подготовка облака и приёмка.
