@@ -262,7 +262,7 @@ test('speech player sends resume for a paused motion clip instead of reloading i
   const [load, resume] = Array.from(context.result, (message) => ({...message}));
   assert.deepEqual(load, {type:'load-motion', sequence:[[1, 2, 3]], body_pose:[[.2,.3]], body_pose_world:null, image_aspect_ratio:undefined, language:'kk-KZ', label:'сәлем', fps:24});
   assert.deepEqual(resume, {type:'resume'});
-  assert.match(html, /message\.type==='resume'[\s\S]*?paused=false/);
+  assert.match(html, /message\.type==='resume'[\s\S]*?resumeMotion\(\)/);
   assert.match(speechHtml, /event\.source !== motionFrame\.contentWindow \|\| event\.origin !== 'http:\/\/localhost:8502'/);
   assert.match(html, /postMessage\(\{type:'motion-ended',label:activeLabel\},'\*'\)/);
   assert.match(speechHtml, /body_pose:segment\.body_pose \|\| metadata\.body_pose_landmarks \|\| null/,

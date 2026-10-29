@@ -193,7 +193,7 @@ test('two clips transition through neutral and emit one completion for the whole
     activeBodyPose:null,activeBodyPoseWorld:null,activeImageAspectRatio:1,motionTracks:{},neutralTransition:null,
     voiceQueue:[next],voiceMissing:[],document:{querySelector:()=>node},cancelAnimationFrame:()=>{},
     humanAvatar:{updateMatrixWorld:()=>{}},window:{parent:{postMessage:value=>events.push(value)}},
-    applyNeutralPose:()=>bone.quaternion.identity(),normalizeImageAspectRatio:()=>1,
+    applyNeutralPose:()=>bone.quaternion.identity(),normalizeImageAspectRatio:()=>1,renderSceneNow:()=>{},requestSceneRender:()=>{},
     playMotion:()=>{starts++;context.playTimer=2;context.playbackElapsed=0;context.neutralTransition=null},
   };
   vm.createContext(context);vm.runInContext(functions('function stopMotion(','function advanceMotion('),context);

@@ -1,14 +1,14 @@
 // Prepared local bone rotations. No source landmarks or bind offsets are edited.
 export const RIG_MOTION_VERSION='rocketbox-02-prepared-v2';
 
-export function bakeRigMotion({bones,frameCount,fps,solveFrame,groups=[],tracked=()=>[]}){
+function createRigBake({bones,frameCount,fps,solveFrame,groups=[],tracked=()=>[]}){
   if(!bones.length||!Number.isInteger(frameCount)||frameCount<1||frameCount>18000||!Number.isFinite(fps)||fps<1||fps>240)
     throw new Error('Некорректная длительность анимации.');
   const neutral=bones.map(b=>b.quaternion.clone()),last=neutral.map(q=>q.clone());
   const lastTracked=neutral.map(q=>q.clone()),missing=groups.map(()=>0);
   const rotations=new Float32Array(frameCount*bones.length*4);
   const quality={missingFrames:groups.map(()=>0),limitedRotations:0};
-  for(let frame=0;frame<frameCount;frame++){
+  function bakeFrame(frame){
     solveFrame(frame);
     const valid=tracked(frame);
     groups.forEach((indices,side)=>{
@@ -30,7 +30,33 @@ export function bakeRigMotion({bones,frameCount,fps,solveFrame,groups=[],tracked
       q.toArray(rotations,(frame*bones.length+i)*4);last[i].copy(q);
     });
   }
-  return{version:RIG_MOTION_VERSION,boneNames:bones.map(b=>b.name),frameCount,fps,rotations,quality};
+  return {
+    bakeFrame,
+    finish(){return{version:RIG_MOTION_VERSION,boneNames:bones.map(b=>b.name),frameCount,fps,rotations,quality}},
+  };
+}
+
+export function bakeRigMotion(options){
+  const task=createRigBake(options);
+  for(let frame=0;frame<options.frameCount;frame++)task.bakeFrame(frame);
+  return task.finish();
+}
+
+export async function bakeRigMotionAsync(options){
+  const {chunkSize=2,yieldControl=()=>new Promise(resolve=>setTimeout(resolve,0)),signal,onChunk}=options;
+  if(!Number.isInteger(chunkSize)||chunkSize<1)throw new Error('Некорректный размер порции подготовки.');
+  const checkCancelled=()=>{if(signal?.aborted){const error=new Error('Подготовка устаревшего движения отменена.');error.name='AbortError';throw error}};
+  const task=createRigBake(options);
+  let chunkStarted=globalThis.performance?.now?.()??Date.now();
+  for(let frame=0;frame<options.frameCount;frame++){
+    checkCancelled();task.bakeFrame(frame);
+    if((frame+1)%chunkSize===0&&frame+1<options.frameCount){
+      const now=globalThis.performance?.now?.()??Date.now();
+      onChunk?.({fromFrame:frame+1-chunkSize,toFrame:frame,durationMs:now-chunkStarted});
+      await yieldControl();checkCancelled();chunkStarted=globalThis.performance?.now?.()??Date.now();
+    }
+  }
+  return task.finish();
 }
 
 export function isPreparedMotion(data,bones,frameCount,fps){

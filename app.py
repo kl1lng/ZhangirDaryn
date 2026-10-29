@@ -70,13 +70,8 @@ except OSError as motion_api_error:
 # ============================================================
 CUSTOM_CSS = """
 <style>
-    /* --- Импорт шрифта Inter --- */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
     /* --- Глобальные стили --- */
-    html, body, [class*="css"] {
-        font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-    }
+    html, body, html *, body *, [class*="css"] { font-family: sans-serif !important; }
     .stApp {
         background: radial-gradient(circle at 10% 0%, rgba(0,212,170,0.08), transparent 30%), linear-gradient(180deg, #080b16 0%, #101629 100%);
     }
@@ -141,7 +136,7 @@ CUSTOM_CSS = """
         border: none !important;
         border-radius: 10px !important;
         font-weight: 600 !important;
-        font-family: 'Inter', system-ui, sans-serif !important;
+        font-family: sans-serif !important;
         padding: 0.5rem 1.5rem !important;
         transition: all 0.3s ease !important;
     }

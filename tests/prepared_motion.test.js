@@ -25,6 +25,51 @@ test('prepared motion seeks identically after arbitrary playback history without
   assert.equal(solves,5);assert.deepEqual(Array.from(data.rotations),source);
 });
 
+test('chunked preparation yields to the event loop and preserves the synchronous motion data',async()=>{
+  const {bakeRigMotion,bakeRigMotionAsync}=await api(),syncBones=fixture(),asyncBones=fixture(),order=[],chunks=[];
+  const source={frameCount:5,fps:25,groups:[[0,1]],tracked:i=>[i!==3],
+    solveFrame:(bones,tag)=>(frame=>{order.push(`${tag}:${frame}`);bones[0].quaternion.setFromAxisAngle(new THREE.Vector3(0,0,1),frame*.08);})};
+  const sync=bakeRigMotion({bones:syncBones,frameCount:source.frameCount,fps:source.fps,groups:source.groups,tracked:source.tracked,solveFrame:source.solveFrame(syncBones,'sync')});
+  const chunked=await bakeRigMotionAsync({bones:asyncBones,frameCount:source.frameCount,fps:source.fps,groups:source.groups,tracked:source.tracked,
+    solveFrame:source.solveFrame(asyncBones,'async'),chunkSize:2,onChunk:chunk=>chunks.push(chunk),yieldControl:async()=>{order.push('yield');await Promise.resolve();}});
+  assert.deepEqual(Array.from(chunked.rotations),Array.from(sync.rotations));
+  assert.deepEqual(chunked.quality,sync.quality);
+  assert.deepEqual(order.filter(item=>item==='yield'),['yield','yield']);
+  assert.deepEqual(order.filter(item=>item.startsWith('async:')),['async:0','async:1','async:2','async:3','async:4']);
+  assert.deepEqual(chunks.map(({fromFrame,toFrame})=>[fromFrame,toFrame]),[[0,1],[2,3]]);
+});
+
+test('chunked preparation stops stale motion after a request is cancelled',async()=>{
+  const {bakeRigMotionAsync}=await api(),bones=fixture(),controller=new AbortController(),frames=[];
+  await assert.rejects(bakeRigMotionAsync({bones,frameCount:8,fps:25,chunkSize:2,signal:controller.signal,
+    solveFrame:frame=>frames.push(frame),yieldControl:async()=>{controller.abort();}}),error=>error.name==='AbortError');
+  assert.deepEqual(frames,[0,1]);
+});
+
+test('pausing while an avatar clip is being prepared stays paused after preparation finishes',async()=>{
+  const html=fs.readFileSync(require('node:path').join(__dirname,'../web/avatar.html'),'utf8');
+  const start=html.indexOf('async function startPreparedPlayback('),end=html.indexOf('async function prepareRigPlayback(',start);
+  const elements=new Map(['#motion-editor','#caption','#preparation-status','#empty','#motion-progress'].map(id=>[id,{}]));
+  let generation=0,scheduled=0;
+  const context={
+    playbackGeneration:0,playTimer:null,activeSequence:[Array(162).fill(.1)],activeFps:24,activeLabel:'сәлем',activeLanguage:'kk-KZ',
+    activeBodyPose:[Array(18).fill(.2)],activeBodyPoseWorld:null,activeImageAspectRatio:1,voiceMissing:[],voiceQueue:[],
+    humanRigBones:[{}],humanLoadFailed:false,preparedMotion:null,preparedRecord:null,preparedKey:null,preparing:false,
+    stopMotion(){this.playbackGeneration=++generation;},
+    document:{querySelector:id=>elements.get(id)||{}},
+    stabilizeHandTrack:sequence=>sequence,interpolateShortHandGaps:sequence=>sequence,stabilizeMotionTrack:track=>track,
+    applyNeutralPose(){},calibrateMotion(){},prepareRigPlayback:async()=>{context.paused=true;},
+    findOpeningRestEnd:()=>0,findClosingRestStart:()=>null,normalizeImageAspectRatio:value=>value,
+    handL:{group:{visible:true},tracked:true,pose:{}},handR:{group:{visible:true},tracked:true,pose:{}},
+    lastHandAssignment:null,previousArmPole:[null,null],previousWristTwist:[null,null],frameIndex:0,playbackElapsed:0,
+    requestAnimationFrame:()=>++scheduled,advanceMotion(){},paused:false,renderFrame(){},
+  };
+  vm.createContext(context);vm.runInContext(html.slice(start,end),context);
+  await context.startPreparedPlayback({signal:new AbortController().signal});
+  assert.equal(context.paused,true);
+  assert.equal(context.playTimer,null,'the preparation must not restart animation after a pause request');
+});
+
 test('missing arm poses hold briefly then blend to neutral instead of snapping to bind pose',async()=>{
   const {bakeRigMotion,applyPreparedFrame}=await api(),bones=fixture();
   const data=bakeRigMotion({bones,frameCount:12,fps:25,groups:[[0,1]],

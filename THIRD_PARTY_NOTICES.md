@@ -27,6 +27,26 @@ The avatar-stage software itself is MIT-licensed, but DosYm does not bundle or
 depend on that software. This is a legacy fallback candidate; the active human
 avatar is documented below.
 
+## DosYm PWA assets and processing tools
+
+`pwa/public/fonts/NotoSans.ttf` is the complete Noto Sans Variable source font,
+distributed under SIL Open Font License 1.1. The PWA interface uses the device's
+system sans-serif stack and does not request this font. Its complete license is
+beside the source font in `pwa/public/fonts/OFL.txt`.
+
+The PWA uses Three.js 0.160.0, MIT; its upstream license is copied into the
+generated, Git-ignored avatar vendor folder from the installed npm package.
+
+`imageio-ffmpeg` 0.6.0 is a BSD-2-Clause Python wrapper. Its Windows wheel used
+for local private video previews contains FFmpeg 7.1 Essentials from Gyan.dev,
+configured with GPL and version-3 components (including libx264/libx265).
+This FFmpeg executable is installed into the ignored virtual environment by
+pip; it is not checked into the repository or served to PWA users. The server
+operator must review the chosen FFmpeg distribution/configuration and its
+redistribution obligations before packaging it with a public deployment.
+Sources: https://github.com/imageio/imageio-ffmpeg and
+https://www.gyan.dev/ffmpeg/builds/ .
+
 `web/models/rocketbox-male-adult-01.glb` is a browser-ready conversion of
 Microsoft Rocketbox's `Male_Adult_01.fbx`. The source avatar library is licensed
 under MIT; the converted file retains the humanoid skeleton and articulated

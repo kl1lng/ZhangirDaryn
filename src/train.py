@@ -73,7 +73,8 @@ def train_model(X: np.ndarray,
                 batch_size: int = 16,
                 validation_split: float = 0.2,
                 augment_factor: int = 1,
-                groups: np.ndarray | None = None) -> tuple:
+                groups: np.ndarray | None = None,
+                checkpoint_dir: str | None = None) -> tuple:
     """
     Обучает модель распознавания жестов.
 
@@ -162,10 +163,11 @@ def train_model(X: np.ndarray,
     # Шаг 3: Настройка callbacks
     # ============================================================
     # Создаём папку для моделей, если её нет
-    os.makedirs(config.MODELS_DIR, exist_ok=True)
+    checkpoint_directory = checkpoint_dir or config.MODELS_DIR
+    os.makedirs(checkpoint_directory, exist_ok=True)
 
     # Путь к лучшей модели
-    best_model_path = os.path.join(config.MODELS_DIR, "best_model.h5")
+    best_model_path = os.path.join(checkpoint_directory, "best_model.h5")
 
     callbacks = [
         # EarlyStopping — остановка, если модель не улучшается.

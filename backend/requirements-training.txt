@@ -1,0 +1,4 @@
+# Install in a separate Python 3.12/3.13 environment; not Python 3.14.
+tensorflow==2.21.0
+numpy>=1.26,<3
+psycopg[binary]==3.3.6

@@ -17,10 +17,11 @@ class MotionApiLanguageTests(unittest.TestCase):
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            with urlopen(f"http://127.0.0.1:{server.server_port}/rig-motion.mjs", timeout=3) as response:
-                self.assertEqual(response.headers.get_content_type(), "text/javascript")
-                self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "*")
-                self.assertEqual(response.read(), (Path(__file__).resolve().parents[1] / "web/rig-motion.mjs").read_bytes())
+            for name in ("rig-motion.mjs", "render-scheduler.mjs"):
+                with urlopen(f"http://127.0.0.1:{server.server_port}/{name}", timeout=3) as response:
+                    self.assertEqual(response.headers.get_content_type(), "text/javascript")
+                    self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "*")
+                    self.assertEqual(response.read(), (Path(__file__).resolve().parents[1] / "web" / name).read_bytes())
         finally:
             server.shutdown()
             server.server_close()

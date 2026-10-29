@@ -44,3 +44,17 @@ node_modules/
 *.log
 .DS_Store
 For Erke
+.env
+.env.*
+!.env.example
+!.env.*.example
+.next/
+.next-performance/
+playwright-report/
+test-results/
+.superpowers/
+*.tsbuildinfo
+.venv-pwa/
+.venv-train/
+/pwa/public/avatar/
+/pwa/public/offline-locales.js

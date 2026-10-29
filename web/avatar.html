@@ -7,7 +7,7 @@
   <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
   <style>
     :root{--blue:#0071e3;--ink:#1d1d1f;--muted:#6e6e73}
-    *{box-sizing:border-box}body{margin:0;min-height:100vh;padding:24px;font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:linear-gradient(145deg,#f5f5f7,#e7edf5);display:grid;place-items:center}
+    *{box-sizing:border-box;font-family:sans-serif!important}body{margin:0;min-height:100vh;padding:24px;font:15px sans-serif;color:var(--ink);background:linear-gradient(145deg,#f5f5f7,#e7edf5);display:grid;place-items:center}
     .stage{width:min(800px,100%);padding:28px;background:rgba(255,255,255,.78);border:1px solid #fff;border-radius:28px;box-shadow:0 20px 60px #27384a1f;backdrop-filter:blur(24px)}
     header{display:flex;justify-content:space-between;align-items:start;margin-bottom:16px}h1{font-size:clamp(24px,4vw,38px);letter-spacing:-.05em;margin:0}.subtitle{color:var(--muted);margin:8px 0 0}.live{color:var(--blue);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
     #scene{height:min(500px,62vh);min-height:360px;border-radius:22px;overflow:hidden;background:radial-gradient(circle at 50% 30%,#fff,#dbe8f6);border:1px solid #fff;position:relative}canvas{display:block;width:100%;height:100%}.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:30px;pointer-events:none}.empty[hidden]{display:none}
@@ -44,7 +44,8 @@
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
-import {bakeRigMotion,applyPreparedFrame,isPreparedMotion,motionFingerprint,createMotionRepository,correctionAt,RIG_MOTION_VERSION} from 'http://127.0.0.1:8502/rig-motion.mjs';
+import {bakeRigMotionAsync,applyPreparedFrame,isPreparedMotion,motionFingerprint,createMotionRepository,correctionAt,RIG_MOTION_VERSION} from 'http://127.0.0.1:8502/rig-motion.mjs';
+import {createRenderScheduler} from 'http://127.0.0.1:8502/render-scheduler.mjs';
 const motionRepository=createMotionRepository();
 let activeSequence=__MOTION_SEQUENCE__;
 let activeLabel=__MOTION_LABEL__;
@@ -54,7 +55,7 @@ let activeBodyPose=/*BODY_POSE__*/null;
 let activeBodyPoseWorld=/*BODY_POSE_WORLD__*/null;
 let activeLanguage=/*MOTION_LANGUAGE__*/"kk-KZ";
 let initialQueue=/*MOTION_QUEUE__*/[];
-let preparedMotion=null,preparedKey=null,preparedRecord=null,preparing=false,humanLoadFailed=false,preparationRequest=0;
+let preparedMotion=null,preparedKey=null,preparedRecord=null,preparing=false,humanLoadFailed=false,preparationRequest=0,preparationAbort=null;
 let loadedRigSignature=null;
 let activeCorrections=[],rigFrameCorrections=[{depth:0,roll:0,contact:false},{depth:0,roll:0,contact:false}];
 let preparationStorage='';
@@ -63,6 +64,11 @@ const THREE_SCENE=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(36,1,.01,100);camera.position.set(0,.32,2.05);camera.lookAt(0,.32,0);
 function frameCamera(){camera.position.set(0,.32,2.05);camera.lookAt(0,.32,0);camera.updateProjectionMatrix()}
 const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('#canvas'),antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+let hostVisible=true;
+const renderScheduler=createRenderScheduler({requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:handle=>cancelAnimationFrame(handle),render:()=>{if(!document.hidden&&hostVisible)renderer.render(THREE_SCENE,camera)}});
+function requestSceneRender(){renderScheduler.invalidate()}
+function renderSceneNow(){if(!document.hidden&&hostVisible)renderer.render(THREE_SCENE,camera)}
+function setHostVisible(visible){hostVisible=Boolean(visible);renderScheduler.setVisible(hostVisible&&!document.hidden);if(!hostVisible)pauseMotion()}
 THREE_SCENE.add(new THREE.HemisphereLight(0xffffff,0x879bb0,2.1));
 const keyLight=new THREE.DirectionalLight(0xffffff,1.6);keyLight.position.set(-1,2,3);THREE_SCENE.add(keyLight);
 const actor=new THREE.Group();THREE_SCENE.add(actor);
@@ -102,6 +108,7 @@ avatarLoader.load('http://127.0.0.1:8502/models/rocketbox-male-adult-02.glb',glt
   const scaledHeadBone=nodes.get('Bip01_Head');
   if(scaledHeadBone){const headPosition=scaledHeadBone.getWorldPosition(new THREE.Vector3());humanAvatar.position.add(new THREE.Vector3(-headPosition.x,.58-headPosition.y,-.18-headPosition.z))}
   humanAvatar.updateMatrixWorld(true);
+  requestSceneRender();
   const boneNames=[
     'Bip01_L_UpperArm','Bip01_L_Forearm','Bip01_L_Hand',
     'Bip01_R_UpperArm','Bip01_R_Forearm','Bip01_R_Hand',
@@ -747,6 +754,8 @@ function findClosingRestStart(sequence,pose,fps){
   return reversed>0?sequence.length-1-reversed:null;
 }
 function stopMotion(){if(playTimer!==null)cancelAnimationFrame(playTimer);playTimer=null;lastPlaybackTime=null;playbackGeneration++}
+function pauseMotion(){paused=true;lastPlaybackTime=null;if(playTimer!==null)cancelAnimationFrame(playTimer);playTimer=null}
+function resumeMotion(){if(!paused||!hostVisible||document.hidden)return;paused=false;lastPlaybackTime=null;if(playTimer===null)playTimer=requestAnimationFrame(advanceMotion)}
 function rigPoseBones(){return humanRigBones?[...humanRigBones,...humanRigFingers.flatMap(chains=>chains.flatMap(chain=>chain.bones))]:[]}
 function presentMotionSample(position){
   const frame=sampleMotionTrack(motionTracks.sequence,position);if(!frame)return;
@@ -783,12 +792,12 @@ function presentMotionWithOpening(position){
   }
 }
 function renderFrame(){
-  if(!motionTracks||!activeSequence.length)return;
+  if(!motionTracks||!activeSequence.length){requestSceneRender();return}
   const duration=activeSequence.length/Math.max(1,activeFps);
   const position=Math.min(playbackElapsed*Math.max(1,activeFps),activeSequence.length-1);
   document.querySelector('#motion-progress').value=position;
   document.querySelector('#motion-time').textContent=`${Math.min(playbackElapsed,duration).toFixed(1)} / ${duration.toFixed(1)} с`;
-  if(playbackElapsed<duration){presentMotionWithOpening(position);return}
+  if(playbackElapsed<duration){presentMotionWithOpening(position);renderSceneNow();return}
   if(!neutralTransition){
     presentMotionWithOpening(activeSequence.length-1);
     const bones=rigPoseBones(),from=bones.map(bone=>bone.quaternion.clone());
@@ -808,6 +817,7 @@ function renderFrame(){
     document.querySelector('#caption').textContent=`Клип завершён: ${activeLabel} · ${activeSequence.length} кадров.${missingText}`;
     voiceMissing=[];
     applyNeutralPose();
+    renderSceneNow();
     // The host page validates both iframe source and sender origin; wildcard here
     // keeps the local player working whether Streamlit was opened via localhost
     // or 127.0.0.1 (their parent origins are different).
@@ -820,19 +830,22 @@ function advanceMotion(now){
   if(lastPlaybackTime!==null&&!paused)playbackElapsed+=Math.min(.1,Math.max(0,(now-lastPlaybackTime)/1000))*Number(document.querySelector('#motion-speed').value);
   lastPlaybackTime=now;
   if(!paused)renderFrame();
-  if(playTimer!==null&&generation===playbackGeneration)playTimer=requestAnimationFrame(advanceMotion);
+  if(playTimer!==null&&!paused&&generation===playbackGeneration)playTimer=requestAnimationFrame(advanceMotion);
 }
 function playMotion(options={}){
+  preparationAbort?.abort();
+  const controller=new AbortController();preparationAbort=controller;
   const request=++preparationRequest;
-  return startPreparedPlayback(options).catch(error=>{
+  return startPreparedPlayback({...options,signal:controller.signal}).catch(error=>{
     if(request!==preparationRequest)return;
     preparing=false;stopMotion();
     document.querySelector('#caption').textContent=`Не удалось подготовить движение: ${error.message}`;
     document.querySelector('#preparation-status').textContent='Подготовка не завершена. Исходные данные не изменены.';
-  });
+  }).finally(()=>{if(preparationAbort===controller)preparationAbort=null});
 }
 async function startPreparedPlayback(options){
   stopMotion();
+  paused=false;
   const generation=playbackGeneration;
   preparedMotion=null;preparedRecord=null;preparedKey=null;preparing=false;
   document.querySelector('#motion-editor').disabled=true;
@@ -847,7 +860,7 @@ async function startPreparedPlayback(options){
   if(humanRigBones)applyNeutralPose();
   activeMotionFrameCount=activeSequence.length;calibrateMotion(activeSequence);
   if(humanRigBones&&activeBodyPose){
-    await prepareRigPlayback(generation,Boolean(options.rebuild));
+    await prepareRigPlayback(generation,Boolean(options.rebuild),options.signal);
     if(generation!==playbackGeneration)return;
   }else{
     document.querySelector('#preparation-status').textContent='Для подготовки полного аватара нужны видимые плечи и локти в исходном видео.';
@@ -857,16 +870,16 @@ async function startPreparedPlayback(options){
   closingRestStart=findClosingRestStart(activeSequence,activeBodyPose,activeFps);
   if(closingRestStart!==null&&closingRestStart<=openingRestEnd+activeFps*.56)closingRestStart=null;
   handL.group.visible=false;handR.group.visible=false;handL.tracked=false;handR.tracked=false;handL.pose=null;handR.pose=null;
-  lastHandAssignment=null;previousArmPole=[null,null];previousWristTwist=[null,null];frameIndex=0;playbackElapsed=0;neutralTransition=null;paused=false;
-  if(Number.isFinite(options.seek)){playbackElapsed=options.seek/activeFps;paused=Boolean(options.pause)}
+  lastHandAssignment=null;previousArmPole=[null,null];previousWristTwist=[null,null];frameIndex=0;playbackElapsed=0;neutralTransition=null;
+  if(Number.isFinite(options.seek)){playbackElapsed=options.seek/activeFps;paused=Boolean(options.pause||paused)}
   document.querySelector('#empty').hidden=true;document.querySelector('#motion-progress').max=Math.max(0,activeSequence.length-1);
-  renderFrame();playTimer=requestAnimationFrame(advanceMotion);
+  renderFrame();playTimer=paused?null:requestAnimationFrame(advanceMotion);
   const missingNote=voiceMissing.length?` · нет клипов: ${voiceMissing.join(', ')}`:'';
   const poseNote=activeBodyPose?'':' · в клипе нет плеч/локтей — показаны только кисти';
   document.querySelector('#caption').textContent=`${options.pause?'Пауза после подготовки':'Воспроизведение из motion-базы'}: ${activeLabel} · ${activeMotionFrameCount} кадров${missingNote}${poseNote}`;
 }
 
-async function prepareRigPlayback(generation,rebuild){
+async function prepareRigPlayback(generation,rebuild,signal){
   const bones=rigPoseBones();
   const key=await motionFingerprint({sequence:activeSequence,pose:activeBodyPose,world:activeBodyPoseWorld,
     fps:activeFps,aspect:activeImageAspectRatio,rig:loadedRigSignature});
@@ -884,7 +897,8 @@ async function prepareRigPlayback(generation,rebuild){
   }else{
     applyNeutralPose();lastHandAssignment=null;previousArmPole=[null,null];previousWristTwist=[null,null];
     const groups=[[0,1],[3,4],[2,...Array.from({length:15},(_,i)=>6+i)],[5,...Array.from({length:15},(_,i)=>21+i)]];
-    const data=bakeRigMotion({bones,frameCount:activeSequence.length,fps:activeFps,groups,
+    const data=await bakeRigMotionAsync({bones,frameCount:activeSequence.length,fps:activeFps,groups,chunkSize:2,signal,
+      onChunk:sample=>window.__dosymPerformance?.preparationChunks?.push(sample),
       solveFrame:frame=>{
         rigFrameCorrections=[0,1].map(side=>correctionAt(activeCorrections,frame,side,activeFps));
         applyNeutralPose();solveSourceFrame(frame);
@@ -959,7 +973,6 @@ document.querySelector('#motion-progress').addEventListener('input',event=>{
   if(!motionTracks)playMotion();
   paused=true;lastPlaybackTime=null;neutralTransition=null;previousArmPole=[null,null];previousWristTwist=[null,null];
   playbackElapsed=Number(event.target.value)/Math.max(1,activeFps);renderFrame();
-  if(playTimer===null)playTimer=requestAnimationFrame(advanceMotion);
   document.querySelector('#caption').textContent=`Пауза: ${activeLabel}.`;
 });
 function startVoice(){
@@ -991,8 +1004,8 @@ function startVoice(){
   recognition.onerror=event=>document.querySelector('#caption').textContent=`Не удалось распознать голос: ${event.error}`;
   recognition.start();document.querySelector('#caption').textContent='Слушаю казахскую фразу…'
 }
-function toggle(){if(preparing)return;if(playTimer===null){playMotion();return}paused=!paused;lastPlaybackTime=null;document.querySelector('#caption').textContent=paused?'Воспроизведение приостановлено.':'Воспроизведение продолжается.'}
-function resetView(){frameCamera()}
+function toggle(){if(preparing)return;if(playTimer===null&&!paused){playMotion();return}if(paused)resumeMotion();else pauseMotion();document.querySelector('#caption').textContent=paused?'Воспроизведение приостановлено.':'Воспроизведение продолжается.'}
+function resetView(){frameCamera();requestSceneRender()}
 window.addEventListener('message',event=>{
   if(event.source!==window.parent||!event.data||typeof event.data!=='object')return;
   const message=event.data;
@@ -1010,13 +1023,16 @@ window.addEventListener('message',event=>{
   }else if(message.type==='play'){
     frameIndex=0;playMotion();
   }else if(message.type==='pause'){
-    paused=true;lastPlaybackTime=null;document.querySelector('#caption').textContent='Воспроизведение приостановлено.';
+    pauseMotion();document.querySelector('#caption').textContent='Воспроизведение приостановлено.';
   }else if(message.type==='resume'){
-    paused=false;lastPlaybackTime=null;document.querySelector('#caption').textContent=`Воспроизведение продолжается: ${activeLabel}.`;
+    resumeMotion();document.querySelector('#caption').textContent=`Воспроизведение продолжается: ${activeLabel}.`;
+  }else if(message.type==='visibility'){
+    setHostVisible(message.visible);
   }
 });
-function resize(){const box=document.querySelector('#scene');const w=box.clientWidth,h=box.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;frameCamera()}addEventListener('resize',resize);resize();
-function draw(){requestAnimationFrame(draw);renderer.render(THREE_SCENE,camera)}draw();
+function resize(){const box=document.querySelector('#scene');const w=box.clientWidth,h=box.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;frameCamera();requestSceneRender()}addEventListener('resize',resize);resize();
+addEventListener('visibilitychange',()=>{renderScheduler.setVisible(!document.hidden&&hostVisible);if(document.hidden)pauseMotion()});
+addEventListener('pagehide',()=>{preparationAbort?.abort();renderScheduler.dispose()});
 window.playMotion=playMotion;window.startVoice=startVoice;window.toggle=toggle;window.resetView=resetView;
 if(Array.isArray(initialQueue)&&initialQueue.length){
   const clips=initialQueue.filter(item=>item&&Array.isArray(item.sequence)&&item.sequence.length);

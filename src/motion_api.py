@@ -26,8 +26,8 @@ class _MotionHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path == "/rig-motion.mjs":
-            module_path = Path(__file__).resolve().parents[1] / "web" / "rig-motion.mjs"
+        if parsed.path in ("/rig-motion.mjs", "/render-scheduler.mjs"):
+            module_path = Path(__file__).resolve().parents[1] / "web" / parsed.path.lstrip("/")
             try:
                 body = module_path.read_bytes()
                 self.send_response(200)
