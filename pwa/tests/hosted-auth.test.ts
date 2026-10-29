@@ -28,3 +28,22 @@ test('hosted Supabase sign-in works without a Python backend and never grants mo
   assert.equal((await request('me',{Authorization:'Bearer local:forged'})).status,403);
  } finally {process.env=originalEnv;globalThis.fetch=originalFetch;}
 });
+
+test('hosted catalog reads the public snapshot without forwarding a visitor token',async()=>{
+ const originalEnv={...process.env},originalFetch=globalThis.fetch;
+ delete process.env.BACKEND_URL;
+ process.env.NEXT_PUBLIC_LIBRARY_URL='https://storage.example.test/gesture-library/v1';
+ try{
+  globalThis.fetch=async(input,options)=>{
+   assert.equal(String(input),'https://storage.example.test/gesture-library/v1/catalog.json');
+   assert.equal(new Headers(options?.headers).has('authorization'),false);
+   return Response.json([{id:'approved',label:'Сәлем',language:'kk-KZ',metadata:{},version:'v1'}]);
+  };
+  const response=await GET(new Request('https://app.example.test/api/gestures',{headers:{Authorization:'Bearer private-session'}}) as NextRequest,{params:Promise.resolve({path:['gestures']})});
+  assert.equal(response.status,200);
+  assert.equal((await response.json())[0].label,'Сәлем');
+  globalThis.fetch=async()=>new Response(null,{status:404});
+  const unavailable=await GET(new Request('https://app.example.test/api/gestures') as NextRequest,{params:Promise.resolve({path:['gestures']})});
+  assert.equal(unavailable.status,503);
+ }finally{process.env=originalEnv;globalThis.fetch=originalFetch;}
+});

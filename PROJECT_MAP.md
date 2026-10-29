@@ -33,6 +33,7 @@ PWA-прогресс: `docs/PWA_PROGRESS.md`. Спецификация и пла
 - `tests/test_*.py` — Python-проверки API, импорта и обучения.
 - `backend/` — FastAPI сервис PWA: SQLite/PostgreSQL, выбор Supabase/direct Google OAuth, роли, загрузки, модерация, Drive/local source storage, extraction worker и trainer-кандидат.
 - `backend/import_motion.py` — read-only dry-run и явный перенос одного или пакета готовых motion-клипов из исходной SQLite в PWA; пакет фильтруется по подтверждённым правам и качеству. Инструкция `docs/IMPORT_MOTION.md`.
+- `backend/export_library.py` — чтение одобренных готовых записей PWA без изменения SQLite и экспорт публичных JSON-координат с каталогом; исключает видео и личные метаданные.
 - `db/migrations/001_public_pwa.sql` — закрытые PostgreSQL-таблицы PWA и RLS/revoke для browser roles.
 - `pwa/` — адаптивный Next.js frontend, Google/Supabase auth integration, dictionary/avatar, upload/moderation, manifest/service worker и Playwright tests.
 - `pwa/scripts/profile-performance.mjs` — локальный Edge-профиль LCP,
@@ -73,6 +74,8 @@ PWA-прогресс: `docs/PWA_PROGRESS.md`. Спецификация и пла
   только с ролью участника; `pwa/tests/hosted-auth.test.ts` проверяет эту границу доступа.
   `pwa/lib/auth-callback.ts` завершает PKCE-вход без повторного обмена кода;
   Google-провайдер включён, облачная сессия подтверждена.
+  `NEXT_PUBLIC_LIBRARY_URL` подключает опубликованный каталог Supabase Storage;
+  координаты выбранного жеста загружаются напрямую из этого хранилища.
   Drive storage, размещение Python backend, backup,
   device install QA и публикация/rollback модели ещё требуют завершения и проверки.
 - Пользовательский Streamlit остаётся инструментом автора.

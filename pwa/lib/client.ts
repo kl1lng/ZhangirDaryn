@@ -23,7 +23,8 @@ export async function api<T>(path:string,options:RequestInit={}):Promise<T>{
   const publicMotion=/^gestures\/[a-zA-Z0-9_-]+\/motion$/.test(path);
   const auth=publicMotion||path==='auth/config'?'':await token();
   const direct=publicMotion||path==='auth/local'||auth.startsWith('local:');
-  const endpoint=direct?(process.env.NEXT_PUBLIC_UPLOAD_ORIGIN||'http://127.0.0.1:8765')+'/'+path:'/api/'+path;
+  const library=process.env.NEXT_PUBLIC_LIBRARY_URL;
+  const endpoint=publicMotion&&library?library.replace(/\/$/,'')+'/'+path.split('/')[1]+'.json':direct?(process.env.NEXT_PUBLIC_UPLOAD_ORIGIN||'http://127.0.0.1:8765')+'/'+path:'/api/'+path;
   const response=await fetch(endpoint,{...options,cache:'no-store',headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+auth}:{}),...options.headers}});
   if(!response.ok){let message='Не удалось выполнить действие.';try{const data=await response.json();message=data.error||data.detail?.[0]?.msg||message;}catch{}throw new ApiError(message,response.status);}
   return response.json();

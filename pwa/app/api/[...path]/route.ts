@@ -9,6 +9,16 @@ async function handle(request:NextRequest, context:{params:Promise<{path:string[
     // No forwarding: Python must see the actual socket peer for local identities.
     return Response.json({error:'Тестовая сессия доступна только напрямую через локальный Python-сервис.'},{status:403});
   }
+  const library=process.env.NEXT_PUBLIC_LIBRARY_URL;
+  if(!process.env.BACKEND_URL && library && request.method==='GET' && path.join('/')==='gestures'){
+    try{
+      const response=await fetch(library.replace(/\/$/,'')+'/catalog.json',{cache:'no-store',signal:AbortSignal.timeout(10000)});
+      if(!response.ok)throw new Error('Library unavailable');
+      const catalog=await response.json();
+      if(!Array.isArray(catalog)||catalog.some(row=>!row||typeof row.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(row.id)||typeof row.label!=='string'||typeof row.version!=='string'))throw new Error('Invalid catalog');
+      return Response.json(catalog,{headers:{'Cache-Control':'no-store'}});
+    }catch{return Response.json({error:'Библиотека временно недоступна.'},{status:503,headers:{'Cache-Control':'no-store'}});}
+  }
   // A frontend-only deployment can authenticate before the ML service is hosted.
   // Backend roles and all dataset operations remain owned by the Python service.
   const supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL;
