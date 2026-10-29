@@ -71,7 +71,9 @@ PWA-прогресс: `docs/PWA_PROGRESS.md`. Спецификация и пла
   PWA размещена на Vercel (`dosym-seven.vercel.app`), параметры Supabase и callback настроены.
   `pwa/app/api/[...path]/route.ts` поддерживает проверку Supabase-сессии без ML backend,
   только с ролью участника; `pwa/tests/hosted-auth.test.ts` проверяет эту границу доступа.
-  Сквозной облачный OAuth, Drive storage, размещение Python backend, backup,
+  `pwa/lib/auth-callback.ts` завершает PKCE-вход без повторного обмена кода;
+  Google-провайдер включён, облачная сессия подтверждена.
+  Drive storage, размещение Python backend, backup,
   device install QA и публикация/rollback модели ещё требуют завершения и проверки.
 - Пользовательский Streamlit остаётся инструментом автора.
 
