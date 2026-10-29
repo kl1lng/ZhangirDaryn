@@ -26,7 +26,7 @@
 - [x] Pinned generated runtime/model assets + worker; model integrity and reproducible build.
 - [x] Lazy `/camera` screen: preview, model/reference preparation, top-three labels, permission errors, lifecycle cleanup, three locales and responsive controls.
 - [x] Tests: fake camera/worker lifecycle and results, genuine MediaPipe execution with a synthetic local video, existing regressions and production build.
-- [ ] Documentation/map, explicit limitations, commit/push/deploy and live smoke test without opening the user's camera.
+- [x] Documentation/map, explicit limitations, commit/push/deploy and live smoke test without opening the user's camera.
 
 ## Validation notes (30 October)
 
@@ -35,3 +35,5 @@
 - Recording test waits for actual composed video frames; seeking a detached paused video previously returned stale frames. Production uses continuously playing camera video.
 - Existing locale/speech/playback checks pass in their normal backend configuration. Those mocks are not designed for the public-snapshot URLs used by the isolated camera test server.
 - Public compact camera.json has 115 approved references, 1,416,093 bytes; downloaded content verified against the export checksum. No camera footage was uploaded.
+
+- Published commit 462ee14 to production deployment dpl_D2szwbRr1uS2g7PQRbvgEvhSjJWF. Live mobile/no-eager-assets and real WASM blank-frame checks both pass; camera screen inspected without activating user hardware.
