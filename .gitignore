@@ -58,3 +58,6 @@ test-results/
 .venv-train/
 /pwa/public/avatar/
 /pwa/public/offline-locales.js
+# The Python virtual-environment rule `lib/` must not hide PWA source modules.
+!pwa/lib/
+!pwa/lib/**
