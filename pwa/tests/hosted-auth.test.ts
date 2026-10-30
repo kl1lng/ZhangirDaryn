@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { GET } from '../app/api/[...path]/route.ts';
 import type { NextRequest } from 'next/server';
 
-test('hosted Supabase sign-in works without a Python backend and never grants moderation', async () => {
+test('hosted Supabase roles require server metadata and a verified Google identity', async () => {
  const originalEnv={...process.env}, originalFetch=globalThis.fetch;
  delete process.env.BACKEND_URL;
  process.env.NEXT_PUBLIC_SUPABASE_URL='https://auth.example.test';
@@ -23,6 +23,10 @@ test('hosted Supabase sign-in works without a Python backend and never grants mo
   assert.equal((await request('me')).status,401);
   const identity=await request('me',{Authorization:'Bearer valid-session'});
   assert.deepEqual(await identity.json(),{id:'verified-user',email:'user@example.test',name:'Participant',role:'user'});
+  globalThis.fetch=async()=>Response.json({id:'verified-user',email:'user@example.test',email_confirmed_at:'2026-10-30T00:00:00Z',identities:[{provider:'google'}],app_metadata:{dosym_role:'moderator'}});
+  assert.equal((await (await request('me',{Authorization:'Bearer valid-session'})).json()).role,'moderator');
+  globalThis.fetch=async()=>Response.json({id:'verified-user',email:'user@example.test',identities:[{provider:'google'}],app_metadata:{dosym_role:'moderator'}});
+  assert.equal((await (await request('me',{Authorization:'Bearer valid-session'})).json()).role,'user');
   globalThis.fetch=async()=>Response.json({error:'expired'},{status:401});
   assert.equal((await request('me',{Authorization:'Bearer expired'})).status,401);
   assert.equal((await request('me',{Authorization:'Bearer local:forged'})).status,403);

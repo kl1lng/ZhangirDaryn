@@ -92,4 +92,5 @@ def identity(settings, store, authorization, *, local_request=False):
         raise DomainError('Нужен подтверждённый Google-аккаунт.',403)
     email=data.get('email','').lower()
     return store.user(data['id'],email,data.get('user_metadata',{}).get('full_name') or 'Участник',
-                      moderator=bool(settings.moderator_email and email==settings.moderator_email))
+                      moderator=bool(settings.moderator_email and email==settings.moderator_email)
+                      or data.get('app_metadata',{}).get('dosym_role')=='moderator')

@@ -20,7 +20,7 @@ async function handle(request:NextRequest, context:{params:Promise<{path:string[
     }catch{return Response.json({error:'Библиотека временно недоступна.'},{status:503,headers:{'Cache-Control':'no-store'}});}
   }
   // A frontend-only deployment can authenticate before the ML service is hosted.
-  // Backend roles and all dataset operations remain owned by the Python service.
+  // Supabase app_metadata is server-controlled; never trust user_metadata for roles.
   const supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if(!process.env.BACKEND_URL && supabaseUrl && supabaseKey && request.method==='GET'){
@@ -35,7 +35,9 @@ async function handle(request:NextRequest, context:{params:Promise<{path:string[
         if(!response.ok)return Response.json({error:'Сессия не подтверждена.'},{status:response.status===401||response.status===403?401:503,headers:privateHeaders});
         const identity=await response.json();
         if(!identity.id)return Response.json({error:'Сессия не подтверждена.'},{status:401,headers:privateHeaders});
-        return Response.json({id:identity.id,email:identity.email||'',name:identity.user_metadata?.full_name||identity.user_metadata?.name||'',role:'user'},{headers:privateHeaders});
+        const googleVerified=Boolean(identity.email_confirmed_at)&&Array.isArray(identity.identities)&&identity.identities.some((item:{provider?:string})=>item.provider==='google');
+        const role=googleVerified&&identity.app_metadata?.dosym_role==='moderator'?'moderator':'user';
+        return Response.json({id:identity.id,email:identity.email||'',name:identity.user_metadata?.full_name||identity.user_metadata?.name||'',role},{headers:privateHeaders});
       }catch{return Response.json({error:'Сервис входа недоступен.'},{status:503,headers:privateHeaders});}
     }
   }
