@@ -24,6 +24,10 @@ header,.controls,.timeline,.caption,.preparation,#empty{display:none!important}b
 </style></head>`);
 html=html.replace("if(event.source!==window.parent||!event.data", "if(event.origin!==location.origin||event.source!==window.parent||!event.data");
 html=html.replace("window.parent.postMessage({type:'motion-ended',label:activeLabel},'*')","window.parent.postMessage({type:'motion-ended',label:activeLabel},location.origin)");
+// Reveal the canvas only after a prepared motion frame, never the loading rig.
+html=html.replace('</head>','<style>#canvas{visibility:hidden}</style></head>');
+html=html.replace('  preparing=true;',"  preparing=true;parent.postMessage({type:'avatar-preparing'},location.origin);");
+html=html.replace('  renderFrame();playTimer=',"  renderFrame();document.querySelector('#canvas').style.visibility='visible';parent.postMessage({type:'avatar-frame-ready'},location.origin);playTimer=");
 html=html.replace('</body>',`<script>window.addEventListener('load',()=>parent.postMessage({type:'avatar-ready'},location.origin));</script></body>`);
 html=html.replace("  if(activeBodyPose){\n    handL.group.visible=false;handR.group.visible=false;", "  if(true){\n    handL.group.visible=false;handR.group.visible=false;");
 html=html.replace('<script type="module">','<script>window.addEventListener("error",()=>parent.postMessage({type:"avatar-error"},location.origin));</script><script type="module">');

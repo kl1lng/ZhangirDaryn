@@ -65,9 +65,9 @@ const camera=new THREE.PerspectiveCamera(36,1,.01,100);camera.position.set(0,.32
 function frameCamera(){camera.position.set(0,.32,2.05);camera.lookAt(0,.32,0);camera.updateProjectionMatrix()}
 const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('#canvas'),antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 let hostVisible=true;
-const renderScheduler=createRenderScheduler({requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:handle=>cancelAnimationFrame(handle),render:()=>{if(!document.hidden&&hostVisible)renderer.render(THREE_SCENE,camera)}});
+const renderScheduler=createRenderScheduler({requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:handle=>cancelAnimationFrame(handle),render:()=>{if(!preparing&&!document.hidden&&hostVisible)renderer.render(THREE_SCENE,camera)}});
 function requestSceneRender(){renderScheduler.invalidate()}
-function renderSceneNow(){if(!document.hidden&&hostVisible)renderer.render(THREE_SCENE,camera)}
+function renderSceneNow(){if(!preparing&&!document.hidden&&hostVisible)renderer.render(THREE_SCENE,camera)}
 function setHostVisible(visible){hostVisible=Boolean(visible);renderScheduler.setVisible(hostVisible&&!document.hidden);if(!hostVisible)pauseMotion()}
 THREE_SCENE.add(new THREE.HemisphereLight(0xffffff,0x879bb0,2.1));
 const keyLight=new THREE.DirectionalLight(0xffffff,1.6);keyLight.position.set(-1,2,3);THREE_SCENE.add(keyLight);

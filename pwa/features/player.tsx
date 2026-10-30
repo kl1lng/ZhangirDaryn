@@ -6,6 +6,9 @@ import {Icon} from './icons';
 export function Player({motions=[],label='Пространство жеста'}:{motions?:Motion[];label?:string}){const {t,errorText}=useI18n();
  const frame=useRef<HTMLIFrameElement>(null);const [ready,setReady]=useState(false),[playing,setPlaying]=useState(false),[paused,setPaused]=useState(false),[error,setError]=useState('');
  const [speed,setSpeed]=useState('1');
+ const [preparing,setPreparing]=useState(true);
+ useEffect(()=>{setPreparing(true);},[motions]);
+ useEffect(()=>{const receive=(event:MessageEvent)=>{if(event.origin!==location.origin||event.source!==frame.current?.contentWindow)return;if(event.data?.type==='avatar-preparing')setPreparing(true);if(event.data?.type==='avatar-frame-ready')setPreparing(false);};window.addEventListener('message',receive);return()=>window.removeEventListener('message',receive);},[]);
  function send(message:object){frame.current?.contentWindow?.postMessage(message,location.origin);}
  function play(){if(!motions.length)return;setPlaying(true);setPaused(false);send({type:'load-motion-queue',segments:motions.map(m=>({type:'motion',label:m.label,sequence:m.sequence,fps:m.fps,language:'kk-KZ',body_pose:m.metadata.body_pose_landmarks,body_pose_world:m.metadata.body_pose_world_landmarks,image_aspect_ratio:m.metadata.image_aspect_ratio})),missing:[]});}
  useEffect(()=>{if(!motions.length){setReady(false);setPlaying(false);setPaused(false);}},[motions.length]);
@@ -17,6 +20,7 @@ export function Player({motions=[],label='Пространство жеста'}:
  return <section className="player" aria-label={t("Проигрыватель жестов")}>
   <div className="stage-top"><span className="scene-label"><span className="tiny-dot"/>{t(label)}</span><span>{t("3D-аватар")}</span></div>
   <div className="scene-wrap">{motions.length?<iframe ref={frame} title={t("Аватар DosYm")} src="/avatar/index.html" onLoad={()=>setReady(true)} onError={()=>setError('Не удалось загрузить сцену.')} />:<div className="avatar-placeholder" aria-label={t("Здесь появится ваш жест")}><Icon name="hand" size={38}/><span>{t("Здесь появится ваш жест")}</span></div>}
+  {motions.length>0&&preparing&&!error&&<div className="avatar-placeholder" role="status" style={{position:'absolute',inset:0,background:'#eaf0f7'}}><Icon name="hand" size={38}/><span>{t('Подготавливаем движение…')}</span></div>}
   {error&&<p className="scene-error" role="status">{errorText(error)}</p>}
   <span className="scene-note">{t("Кисти, движение, смысл.")}</span></div>
   <div className="player-controls"><button className="round-button" aria-label={playing?t("Приостановить"):paused?t("Продолжить"):t("Воспроизвести")} disabled={!motions.length||!ready} onClick={()=>{if(playing){send({type:'pause'});setPlaying(false);setPaused(true);}else if(paused){send({type:'resume'});setPlaying(true);setPaused(false);}else play();}}><Icon name={playing?'pause':'play'}/></button>
