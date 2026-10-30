@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';
+test('dictionary combines type, alphabetic order and search',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('dosym-locale','ru'));
+ await page.route('**/api/gestures',route=>route.fulfill({json:['Я','Ә','А','Сәлем','Автобус','Қайырлы таң'].map((label,i)=>({id:String(i),label,language:'kk-KZ',metadata:{}}))}));
+ await page.goto('/dictionary');
+ const cards=page.locator('.gesture-row h2');
+ await expect(cards).toHaveText(['А','Автобус','Ә','Қайырлы таң','Сәлем','Я']);
+ await page.getByLabel('Тип',{exact:true}).selectOption('letters');
+ await expect(cards).toHaveText(['А','Ә','Я']);
+ await page.getByLabel('Сортировка',{exact:true}).selectOption('desc');
+ await expect(cards).toHaveText(['Я','Ә','А']);
+ await page.getByLabel('Тип',{exact:true}).selectOption('words');
+ await expect(cards).toHaveText(['Сәлем','Автобус']);
+ await page.getByLabel('Поиск по словарю').fill('salem');
+ await expect(cards).toHaveText(['Сәлем']);
+ await page.getByLabel('Тип',{exact:true}).selectOption('phrases');
+ await expect(cards).toHaveCount(0);
+ await page.getByRole('button',{name:'Сбросить фильтры'}).click();
+ await expect(cards).toHaveCount(6);
+});
