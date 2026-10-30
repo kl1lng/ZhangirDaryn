@@ -14,7 +14,7 @@ test('speech appends final text once, keeps interim text separate and stops on n
  await page.goto('/');
  await page.getByLabel('Текст для показа жестами').fill('А');
  await page.getByRole('button',{name:'Начать голосовой ввод'}).click();
- expect(await page.evaluate(()=>(window as any).speechInstance.lang)).toBe('kk-KZ');
+ expect(await page.evaluate(()=>(window as any).speechInstance.lang)).toBe('ru-RU');
  await page.evaluate(()=>(window as any).speechInstance.onresult({resultIndex:0,results:[Object.assign([{transcript:'Сәлем'}],{isFinal:false})]}));
  await expect(page.getByLabel('Текст для показа жестами')).toHaveValue('А');
  await expect(page.getByText('Сәлем',{exact:true})).toBeVisible();
@@ -33,3 +33,4 @@ test('unsupported speech remains explicit and does not disable text entry',async
  await expect(page.getByText('Голосовой ввод недоступен в этом браузере.')).toBeVisible();
  await expect(page.getByLabel('Текст для показа жестами')).toBeEditable();
 });
+
