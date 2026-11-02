@@ -544,6 +544,28 @@ function interpolateShortHandGaps(sequence,maxGap=3){
   }
   return frames
 }
+function interpolateShortPoseGaps(track,maxGap=8){
+  if(!track?.length)return track;
+  const frames=track.map(frame=>frame.slice());
+  const valid=(frame,k)=>{for(let j=k;j<k+3;j++)if(Number.isFinite(frame[j])&&Math.abs(frame[j])>1e-9)return true;return false};
+  // Zero triples are missing detections. Fill only short interior gaps per
+  // landmark; longer losses stay missing instead of inventing a motion.
+  for(let k=0;k+2<frames[0].length;k+=3){
+    let index=0;
+    while(index<frames.length){
+      if(valid(frames[index],k)){index++;continue}
+      const first=index;while(index<frames.length&&!valid(frames[index],k))index++;
+      const before=first-1,after=index,gap=after-first;
+      if(before>=0&&after<frames.length&&gap<=maxGap){
+        for(let i=first;i<after;i++){
+          const amount=(i-before)/(after-before);
+          for(let j=k;j<k+3;j++)frames[i][j]=frames[before][j]*(1-amount)+frames[after][j]*amount
+        }
+      }
+    }
+  }
+  return frames
+}
 function sampleMotionTrack(track,position){
   if(!track?.length)return null;
   const index=Math.min(Math.floor(position),track.length-1),a=track[index],b=track[Math.min(index+1,track.length-1)];
@@ -856,7 +878,7 @@ async function startPreparedPlayback(options){
   preparing=true;
   document.querySelector('#caption').textContent='Подготавливаю движение…';
   if(!humanRigBones&&!humanLoadFailed){document.querySelector('#preparation-status').textContent='Загружаю модель аватара…';return}
-  motionTracks={sequence:stabilizeHandTrack(interpolateShortHandGaps(activeSequence),activeFps),pose:stabilizeMotionTrack(activeBodyPose,activeFps),world:stabilizeMotionTrack(activeBodyPoseWorld,activeFps)};
+  motionTracks={sequence:stabilizeHandTrack(interpolateShortHandGaps(activeSequence),activeFps),pose:stabilizeMotionTrack(interpolateShortPoseGaps(activeBodyPose),activeFps),world:stabilizeMotionTrack(interpolateShortPoseGaps(activeBodyPoseWorld),activeFps)};
   if(humanRigBones)applyNeutralPose();
   activeMotionFrameCount=activeSequence.length;calibrateMotion(activeSequence);
   if(humanRigBones&&activeBodyPose){

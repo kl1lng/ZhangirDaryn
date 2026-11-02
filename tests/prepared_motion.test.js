@@ -57,7 +57,7 @@ test('pausing while an avatar clip is being prepared stays paused after preparat
     humanRigBones:[{}],humanLoadFailed:false,preparedMotion:null,preparedRecord:null,preparedKey:null,preparing:false,
     stopMotion(){this.playbackGeneration=++generation;},
     document:{querySelector:id=>elements.get(id)||{}},
-    stabilizeHandTrack:sequence=>sequence,interpolateShortHandGaps:sequence=>sequence,stabilizeMotionTrack:track=>track,
+    stabilizeHandTrack:sequence=>sequence,interpolateShortHandGaps:sequence=>sequence,stabilizeMotionTrack:track=>track,interpolateShortPoseGaps:track=>track,
     applyNeutralPose(){},calibrateMotion(){},prepareRigPlayback:async()=>{context.paused=true;},
     findOpeningRestEnd:()=>0,findClosingRestStart:()=>null,normalizeImageAspectRatio:value=>value,
     handL:{group:{visible:true},tracked:true,pose:{}},handR:{group:{visible:true},tracked:true,pose:{}},
