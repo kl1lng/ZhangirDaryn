@@ -57,7 +57,7 @@ function Shell(){const {t}=useI18n();
   </div>
  </div>;
 }
-export function Empty({title,text,children}:{title:string;text:string;children?:React.ReactNode}){return <div className="empty-state"><span className="empty-symbol"><Icon name="hand" size={30}/></span><h2>{title}</h2><p>{text}</p>{children}</div>;}
+export function Empty({title,text,children}:{title:string;text:string;children?:React.ReactNode}){return <div className="empty-state"><span className="empty-symbol"><img className="logo-inline" src="/icons/logo-wide.png" alt="" width="44" height="24"/></span><h2>{title}</h2><p>{text}</p>{children}</div>;}
 export function PageHeading({title,text,aside}:{title:string;text:string;aside?:React.ReactNode}){return <div className="page-heading"><div><h1>{title}</h1><p>{text}</p></div>{aside}</div>;}
 export function Guard({children,moderator=false}:{children:React.ReactNode;moderator?:boolean}){const {t}=useI18n();
  const {user,loading}=useAuth();const path=usePathname();
@@ -91,7 +91,7 @@ function Translate(){const {t,errorText}=useI18n();
  <div className="input-script-hint">{t("Кириллица или латиница: Сәлем / sälem / salem")}</div>{ambiguous.map(item=><div className="warning" role="status" key={item.query}><strong>{t("Уточните жест")}: {item.query}</strong><p>{t("Несколько жестов подходят к этому написанию. Выберите нужный:")}</p><div className="chips">{item.options.map(option=><button key={option.id} onClick={()=>{setText(option.label);void show(option.label,option);}}>{option.label}</button>)}</div></div>)}
  <div className="suggestions"><h3>{t("Начните с одного слова")}</h3>{gestures.length?<div className="chips">{gestures.slice(0,5).map(g=><button key={g.id} onClick={()=>{setText(g.label);void show(g.label);}}>{g.label}</button>)}</div>:<p>{t("Библиотека пополняется проверенными записями. Пока здесь нет готовых жестов.")}</p>}</div>
  <div className="honest-note"><Icon name="shield" size={19}/><p>{t("Показ отдельных жестов не заменяет полноценный перевод предложения. Понятность движения требует проверки носителями КЖЯ.")}</p></div></section><Player motions={motions}/></div>
- <section className="contribution"><div className="contribution-icon"><Icon name="hand" size={33}/></div><div><h2>{t("Библиотека начинается с людей")}</h2><p>{t("Знаете жест? Запишите короткое видео. Мы сохраним движение, а не только файл.")}</p></div><Link href="/upload" className="button secondary">{t("Добавить видео")}<Icon name="add" size={19}/></Link></section></>;
+ <section className="contribution"><div className="contribution-icon"><img className="logo-inline" src="/icons/logo-wide.png" alt="" width="44" height="24"/></div><div><h2>{t("Библиотека начинается с людей")}</h2><p>{t("Знаете жест? Запишите короткое видео. Мы сохраним движение, а не только файл.")}</p></div><Link href="/upload" className="button secondary">{t("Добавить видео")}<Icon name="add" size={19}/></Link></section></>;
 }
 function Dictionary(){const {t,errorText,locale}=useI18n();
  const [kind,setKind]=useState('all'),[order,setOrder]=useState('asc'),[initial,setInitial]=useState('');

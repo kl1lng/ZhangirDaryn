@@ -123,3 +123,6 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 .story-logo{display:block;width:150px;height:auto;margin:12px 0 28px}
 
 .note-logo{display:block;width:56px;height:auto;flex:none}
+
+.logo-inline{display:block;height:auto;max-width:100%}
+.contribution-icon,.empty-symbol{padding:6px}
