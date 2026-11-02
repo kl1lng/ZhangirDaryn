@@ -5,6 +5,7 @@ export function Icon({name,size=22}:{name:string;size?:number}){
   add:<><path d="M12 5v14M5 12h14"/></>,
   folder:<path d="M3 7V5h6l2 3h10v12H3z"/>,
   shield:<><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/></>,
+  user:<><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></>,
   settings:<><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></>,
   play:<path d="m9 5 11 7-11 7z"/>,pause:<><path d="M8 5v14M16 5v14"/></>,
   search:<><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></>,
