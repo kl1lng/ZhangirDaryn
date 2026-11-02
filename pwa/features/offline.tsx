@@ -3,7 +3,7 @@ import {useI18n} from './locale';
 import {createContext,useContext,useEffect,useState} from 'react';
 import type {Motion} from '@/lib/types';
 import {staleOfflineIds} from '@/lib/offline-policy';
-const CACHE='dosym-public-v1';
+const CACHE='dosym-public-v2';
 const Context=createContext<{saved:Motion[];save:(motion:Motion)=>Promise<void>;remove:(id:string)=>Promise<void>;clear:()=>Promise<void>}>({saved:[],save:async()=>{},remove:async()=>{},clear:async()=>{}});
 export const useOffline=()=>useContext(Context);
 async function database(){return new Promise<IDBDatabase>((resolve,reject)=>{const request=indexedDB.open('dosym-public-motions',1);request.onupgradeneeded=()=>request.result.createObjectStore('motions',{keyPath:'id'});request.onerror=()=>reject(new Error('Браузер не разрешил локальное хранение.'));request.onsuccess=()=>resolve(request.result);});}
@@ -25,7 +25,7 @@ export function OfflineProvider({children}:{children:React.ReactNode}){const {t}
   if(!('caches' in window)||!navigator.onLine)throw new Error('Для первого сохранения нужны сеть и поддержка хранилища браузером.');
   const cache=await caches.open(CACHE);const assetResponse=await fetch('/avatar/assets.json');if(!assetResponse.ok)throw new Error('Не удалось получить ресурсы аватара.');
   const assets=await assetResponse.json() as string[];
-  assets.push('/offline.html','/offline.js','/offline-locales.js','/icons/icon.svg');
+  assets.push('/offline.html','/offline.js','/offline-locales.js','/icons/favicon-64.png');
   for(const url of new Set(assets)){const cached=await cache.match(url);if(!cached){const response=await fetch(url);if(!response.ok)throw new Error('Не все ресурсы загрузились. Повторите сохранение.');await cache.put(url,response);}}
   await operation('readwrite',store=>store.put(motion));await refresh();
  }

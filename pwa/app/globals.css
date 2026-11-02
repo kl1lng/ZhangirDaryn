@@ -117,3 +117,7 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 .camera-results li a:hover{background:rgb(var(--brand-100));transform:translateY(-1px)}
 .camera-results h2{font-size:15px}
 @media(prefers-reduced-motion:no-preference){.camera-placeholder svg{animation:ring 2.6s ease-in-out infinite}@keyframes ring{50%{box-shadow:0 0 0 1px rgb(255 255 255/.28),0 0 0 22px rgb(255 255 255/.0)}}}
+
+/* ---- logo ---- */
+.brand-logo{display:block;width:64px;height:auto;flex:none}
+.story-logo{display:block;width:150px;height:auto;margin:12px 0 28px}

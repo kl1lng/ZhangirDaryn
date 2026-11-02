@@ -1,5 +1,5 @@
-const CACHE='dosym-public-v1';
-self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(['/offline.html','/offline.js','/offline-locales.js','/icons/icon.svg']))));
+const CACHE='dosym-public-v2';
+self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(['/offline.html','/offline.js','/offline-locales.js','/icons/favicon-64.png']))));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();});
 self.addEventListener('fetch',event=>{
