@@ -63,3 +63,7 @@ test-results/
 # The Python virtual-environment rule `lib/` must not hide PWA source modules.
 !pwa/lib/
 !pwa/lib/**
+
+# Local scratch (not part of the app)
+.slidebuild/
+output/
