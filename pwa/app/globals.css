@@ -20,3 +20,55 @@
 .dictionary-filters{display:flex;align-items:end;gap:16px;flex-wrap:wrap;margin:16px 0 24px}.dictionary-filters label{display:grid;gap:6px;color:var(--muted);font-size:13px}.dictionary-filters select{font:inherit;color:var(--ink);background:white;border:1px solid var(--line);border-radius:10px;padding:12px;min-height:44px;min-width:150px}.dictionary-filters [role=status]{align-self:center;color:var(--muted);font-size:13px}@media(max-width:600px){.dictionary-filters label{flex:1}.dictionary-filters select{width:100%;min-width:0}}
 
 .alphabet-filter{margin:18px 0 8px;display:grid;gap:9px;color:var(--muted);font-size:13px}.alphabet-filter>div{display:flex;gap:7px;flex-wrap:wrap}.alphabet-filter button{min-width:42px;min-height:42px;border:1px solid var(--line);border-radius:9px;background:white;color:var(--ink);font:inherit;cursor:pointer}.alphabet-filter button.active{background:var(--blue);border-color:var(--blue);color:white}.alphabet-filter button:focus-visible{outline:3px solid #347fae66;outline-offset:2px}
+
+/* ===== DosYm design layer v2 (design-system/dosym/MASTER.md) ===== */
+:root{
+  --brand-50: 243 246 252;
+  --brand-100: 227 234 247;
+  --brand-200: 199 212 240;
+  --brand-300: 153 179 235;
+  --brand-400: 90 133 223;
+  --brand-500: 41 97 212;
+  --brand-600: 36 84 184;
+  --brand-700: 28 66 146;
+  --brand-800: 22 51 111;
+  --brand-900: 15 35 77;
+  --brand-950: 6 14 30;
+  --accent-50: 243 252 252;
+  --accent-100: 226 248 247;
+  --accent-200: 197 241 240;
+  --accent-300: 149 238 235;
+  --accent-400: 55 223 217;
+  --accent-500: 27 167 161;
+  --accent-600: 20 125 121;
+  --accent-700: 14 85 83;
+  --accent-800: 8 50 49;
+  --accent-900: 4 26 26;
+  --accent-950: 4 26 26;
+  --blue:rgb(var(--brand-600));--blue-strong:rgb(var(--brand-700));--blue-soft:rgb(var(--brand-50));
+  --teal:rgb(var(--accent-600));--ink:#14233a;--muted:#586a82;--line:#dde5f0;--paper:#f4f7fc;
+  --ring:rgb(var(--brand-400));--shadow-card:0 1px 2px rgb(var(--brand-900)/.06),0 18px 40px -26px rgb(var(--brand-900)/.28);
+  --shadow-lift:0 2px 4px rgb(var(--brand-900)/.08),0 24px 48px -24px rgb(var(--brand-900)/.34);
+  --ease-out:cubic-bezier(.22,1,.36,1);
+}
+body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--brand-300)/.28) 1px,transparent 1.2px);background-size:22px 22px;background-attachment:fixed;color:var(--ink)}
+.sidebar{background:linear-gradient(180deg,#fff,rgb(var(--brand-50)))}
+.nav-item{transition:background-color .18s var(--ease-out),color .18s var(--ease-out),transform .18s var(--ease-out)}
+.nav-item:hover{background:rgb(var(--brand-50));color:var(--blue-strong)}
+.nav-item.active{background:rgb(var(--brand-100));color:var(--blue-strong);font-weight:700;box-shadow:inset 3px 0 0 var(--blue)}
+.topbar{background:rgb(255 255 255/.82);backdrop-filter:blur(10px)}
+.page-heading h1{font-size:clamp(28px,3.1vw,42px);font-weight:800;letter-spacing:-.035em;line-height:1.08;position:relative;padding-bottom:16px}
+.page-heading h1::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:5px;border-radius:5px;background:linear-gradient(90deg,var(--blue),var(--teal))}
+.compose-panel,.upload-form,.camera-panel,.login-layout{border-radius:20px;box-shadow:var(--shadow-card);border-color:var(--line)}
+.scene-wrap{border-radius:0}
+.button{transition:transform .18s var(--ease-out),box-shadow .18s var(--ease-out),background-color .18s var(--ease-out);font-size:14px}
+.button.primary{background:var(--blue);box-shadow:0 8px 18px -10px rgb(var(--brand-700)/.9)}
+.button.primary:hover:not(:disabled){background:var(--blue-strong);transform:translateY(-1px);box-shadow:0 12px 22px -10px rgb(var(--brand-700))}
+.button:active:not(:disabled){transform:translateY(0) scale(.985)}
+:focus-visible{outline:3px solid var(--ring)!important;outline-offset:3px!important;border-radius:8px}
+.alphabet-filter button,.gesture-letter{transition:background-color .15s,border-color .15s,transform .15s var(--ease-out)}
+.alphabet-filter button:hover:not(.active){border-color:var(--blue);background:rgb(var(--brand-50));transform:translateY(-1px)}
+.gesture-row{transition:transform .2s var(--ease-out),box-shadow .2s var(--ease-out),border-color .2s}
+.gesture-row:hover{transform:translateY(-2px);box-shadow:var(--shadow-lift);border-color:rgb(var(--brand-300))}
+.language-switcher{border-color:var(--line);color:var(--ink)}
+@media(prefers-reduced-motion:reduce){.nav-item,.button,.gesture-row,.alphabet-filter button{transition:none!important;transform:none!important}}
