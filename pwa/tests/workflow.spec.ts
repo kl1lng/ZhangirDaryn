@@ -36,6 +36,7 @@ test('mobile layout fits and keeps navigation accessible', async ({ page }) => {
 });
 
 test('empty dictionary does not claim unavailable translations', async ({ page }) => {
+  await page.route('**/api/gestures', route => route.fulfill({ json: [] })); // independent of the local library contents
   await page.goto('/dictionary');
   await expect(page.getByText('Библиотека пока пуста')).toBeVisible();
   await page.goto('/');

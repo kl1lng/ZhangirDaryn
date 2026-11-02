@@ -8,7 +8,7 @@ test('player loads the avatar only after a gesture is chosen and sends motion wi
  await page.route('**/api/me',route=>route.fulfill({status:401,json:{error:'Sign in'}}));
  await page.route('**/api/gestures',route=>route.fulfill({json:[{id:'fixture-motion',label:'сәлем',language:'kk-KZ',metadata:{}}]}));
  await page.route('**/gestures/fixture-motion/motion',route=>route.fulfill({headers:{'Access-Control-Allow-Origin':'*'},json:{id:'fixture-motion',label:'сәлем',sequence:[Array(162).fill(0.1)],fps:24,version:'fixture',metadata:{}}}));
- await page.route('**/avatar/index.html',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><p id="received">No motion</p><script>addEventListener('message',e=>{if(e.source===parent&&e.data.type==='load-motion-queue')document.querySelector('#received').textContent=e.data.segments[0].label;});</script>`}));
+ await page.route('**/avatar/index.html*',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><p id="received">No motion</p><script>addEventListener('message',e=>{if(e.source===parent&&e.data.type==='load-motion-queue')document.querySelector('#received').textContent=e.data.segments[0].label;});</script>`}));
  await page.goto('/');
  await expect(page.locator('.player iframe')).toHaveCount(0);
  await expect(page.getByRole('button',{name:'сәлем',exact:true})).toBeVisible();
@@ -24,7 +24,7 @@ test('player pauses offscreen and does not auto-resume when it becomes visible',
  await page.route('**/api/me',route=>route.fulfill({status:401,json:{error:'Sign in'}}));
  await page.route('**/api/gestures',route=>route.fulfill({json:[{id:'fixture-motion',label:'сәлем',language:'kk-KZ',metadata:{}}]}));
  await page.route('**/gestures/fixture-motion/motion',route=>route.fulfill({headers:{'Access-Control-Allow-Origin':'*'},json:{id:'fixture-motion',label:'сәлем',sequence:[Array(162).fill(0.1)],fps:24,version:'fixture',metadata:{}}}));
- await page.route('**/avatar/index.html',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><p id="visibility">unknown</p><p id="playback">ready</p><script>
+ await page.route('**/avatar/index.html*',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><p id="visibility">unknown</p><p id="playback">ready</p><script>
  addEventListener('message',event=>{if(event.source!==parent)return;
  if(event.data.type==='visibility')document.querySelector('#visibility').textContent=event.data.visible?'visible':'hidden';
  if(event.data.type==='load-motion-queue')document.querySelector('#playback').textContent='playing';

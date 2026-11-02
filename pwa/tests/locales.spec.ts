@@ -1,13 +1,13 @@
 import {test,expect} from '@playwright/test';
 
-test.use({serviceWorkers:'block'});
+test.use({serviceWorkers:'block',storageState:{cookies:[],origins:[]}});
 
 test.beforeEach(async({page})=>{
  await page.route('**/api/auth/config',route=>route.fulfill({json:{auth_provider:'google',google_configured:true,local_auth:false,storage:'local'}}));
  await page.route('**/api/me',route=>route.fulfill({status:401,json:{error:'Sign in'}}));
  await page.route('**/api/gestures',route=>route.fulfill({json:[{id:'future-word',label:'Жаңа',language:'kk-KZ',metadata:{}}]}));
  await page.route('**/gestures/future-word/motion',route=>route.fulfill({headers:{'Access-Control-Allow-Origin':'*'},json:{id:'future-word',label:'Жаңа',sequence:[Array(162).fill(0.1)],fps:24,version:'fixture',metadata:{}}}));
- await page.route('**/avatar/index.html',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><p id="received"></p><script>addEventListener('message',e=>{if(e.source===parent&&e.data.type==='load-motion-queue')document.querySelector('#received').textContent=e.data.segments[0].label;});</script>`}));
+ await page.route('**/avatar/index.html*',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><p id="received"></p><script>addEventListener('message',e=>{if(e.source===parent&&e.data.type==='load-motion-queue')document.querySelector('#received').textContent=e.data.segments[0].label;});</script>`}));
 });
 
 test('Kazakh default, Russian and English switch preserves input and selected locale',async({page})=>{
