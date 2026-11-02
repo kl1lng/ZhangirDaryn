@@ -99,3 +99,21 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 .empty-symbol{background:linear-gradient(145deg,rgb(var(--brand-50)),rgb(var(--brand-100)));box-shadow:inset 0 0 0 1px rgb(var(--brand-200))}
 .sidebar-bottom,.brand small{letter-spacing:.01em}
 @media(prefers-reduced-motion:no-preference){.flow-dot{transition:transform .2s var(--ease-out)}.flow li:hover .flow-dot{transform:scale(1.08)}}
+
+/* ---- camera stage details ---- */
+.camera-panel{box-shadow:var(--shadow-card);border-radius:20px}
+.camera-preview{background:radial-gradient(ellipse at 50% 35%,rgb(var(--brand-700)) 0,rgb(var(--brand-900)) 62%,rgb(var(--brand-950)) 100%);box-shadow:inset 0 0 0 1px rgb(var(--brand-400)/.25),0 18px 40px -24px rgb(var(--brand-950)/.7)}
+.camera-preview::before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgb(255 255 255/.14) 1px,transparent 1.2px);background-size:22px 22px;pointer-events:none;z-index:1}
+.camera-preview::after{content:"";position:absolute;inset:18px;border-radius:8px;pointer-events:none;z-index:2;opacity:.7;
+ background:
+  linear-gradient(#fff,#fff) top left/26px 2px no-repeat,linear-gradient(#fff,#fff) top left/2px 26px no-repeat,
+  linear-gradient(#fff,#fff) top right/26px 2px no-repeat,linear-gradient(#fff,#fff) top right/2px 26px no-repeat,
+  linear-gradient(#fff,#fff) bottom left/26px 2px no-repeat,linear-gradient(#fff,#fff) bottom left/2px 26px no-repeat,
+  linear-gradient(#fff,#fff) bottom right/26px 2px no-repeat,linear-gradient(#fff,#fff) bottom right/2px 26px no-repeat}
+.camera-placeholder{z-index:3;color:#fff;font-weight:600}
+.camera-placeholder svg{padding:18px;box-sizing:content-box;border-radius:50%;background:rgb(255 255 255/.1);box-shadow:0 0 0 1px rgb(255 255 255/.28),0 0 0 14px rgb(255 255 255/.06)}
+.camera-results ul{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px}
+.camera-results li a{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:999px;background:rgb(var(--brand-50));border:1px solid rgb(var(--brand-200));color:var(--blue-strong);font-weight:700;transition:background-color .15s,transform .15s var(--ease-out)}
+.camera-results li a:hover{background:rgb(var(--brand-100));transform:translateY(-1px)}
+.camera-results h2{font-size:15px}
+@media(prefers-reduced-motion:no-preference){.camera-placeholder svg{animation:ring 2.6s ease-in-out infinite}@keyframes ring{50%{box-shadow:0 0 0 1px rgb(255 255 255/.28),0 0 0 22px rgb(255 255 255/.0)}}}
