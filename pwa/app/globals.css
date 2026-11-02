@@ -126,3 +126,13 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 
 .logo-inline{display:block;height:auto;max-width:100%}
 .contribution-icon,.empty-symbol{padding:6px}
+
+/* ---- sign-in as a modal window over a dimmed page ---- */
+.login-overlay{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:24px;background:rgb(var(--brand-950)/.5);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);overflow:auto;animation:overlay-in .2s ease-out}
+.login-overlay .login-layout{position:relative;margin:0;width:min(1000px,100%);max-height:calc(100dvh - 48px);overflow:auto;box-shadow:0 30px 80px -20px rgb(var(--brand-950)/.55),0 0 0 1px rgb(255 255 255/.4);outline:none;animation:dialog-in .26s var(--ease-out)}
+.login-close{position:absolute;top:14px;right:14px;z-index:3;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:26px;line-height:1;display:grid;place-items:center;transition:background-color .15s,transform .15s var(--ease-out)}
+.login-close:hover{background:rgb(var(--brand-50));transform:rotate(90deg)}
+@keyframes overlay-in{from{opacity:0}}
+@keyframes dialog-in{from{opacity:0;transform:translateY(14px) scale(.98)}}
+@media(max-width:767px){.login-overlay{padding:12px;place-items:end center}.login-overlay .login-layout{max-height:calc(100dvh - 24px)}}
+@media(prefers-reduced-motion:reduce){.login-overlay,.login-overlay .login-layout{animation:none}.login-close:hover{transform:none}}
