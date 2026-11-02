@@ -72,3 +72,5 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 .gesture-row:hover{transform:translateY(-2px);box-shadow:var(--shadow-lift);border-color:rgb(var(--brand-300))}
 .language-switcher{border-color:var(--line);color:var(--ink)}
 @media(prefers-reduced-motion:reduce){.nav-item,.button,.gesture-row,.alphabet-filter button{transition:none!important;transform:none!important}}
+
+@media(max-width:767px){.alphabet-filter>div{flex-wrap:nowrap;overflow-x:auto;padding-bottom:8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}.alphabet-filter button{flex:none;scroll-snap-align:start}}

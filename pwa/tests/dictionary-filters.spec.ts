@@ -18,3 +18,11 @@ test('dictionary combines type, alphabetic order and search',async({page})=>{
  await page.getByRole('button',{name:'Сбросить фильтры'}).click();
  await expect(cards).toHaveCount(6);
 });
+
+test('searching a missing word offers to record that sign',async({page})=>{
+ await page.route('**/api/gestures',route=>route.fulfill({json:[{id:'1',label:'Сәлем',language:'kk-KZ',metadata:{}}]}));
+ await page.goto('/dictionary');
+ await page.getByRole('searchbox').or(page.locator('.search-field input')).first().fill('Рахмет');
+ await expect(page.getByText('Жеста «Рахмет» пока нет')).toBeVisible();
+ await expect(page.getByRole('link',{name:'Записать этот жест'})).toHaveAttribute('href','/upload');
+});
