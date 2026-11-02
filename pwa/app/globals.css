@@ -136,3 +136,18 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 @keyframes dialog-in{from{opacity:0;transform:translateY(14px) scale(.98)}}
 @media(max-width:767px){.login-overlay{padding:12px;place-items:end center}.login-overlay .login-layout{max-height:calc(100dvh - 24px)}}
 @media(prefers-reduced-motion:reduce){.login-overlay,.login-overlay .login-layout{animation:none}.login-close:hover{transform:none}}
+
+/* ---- gesture page: player + side cards ---- */
+.detail-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,.75fr);gap:26px;align-items:start}
+.detail-grid .detail-player{max-width:none;margin-bottom:0}
+.detail-grid .detail-player .scene-wrap{min-height:520px}
+.detail-side{display:grid;gap:18px}
+.detail-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:var(--shadow-card);display:grid;gap:14px}
+.detail-card h2{font-size:15px;margin:0;font-weight:700}
+.detail-facts{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.detail-facts li{display:flex;justify-content:space-between;gap:12px;font-size:14px;border-bottom:1px dashed var(--line);padding-bottom:9px}
+.detail-facts span{color:var(--muted)}
+.detail-near{display:flex;flex-wrap:wrap;gap:10px}
+.chip-link{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:999px;background:rgb(var(--brand-50));border:1px solid rgb(var(--brand-200));color:var(--blue-strong);font-weight:700;transition:background-color .15s,transform .15s var(--ease-out)}
+.chip-link:hover{background:rgb(var(--brand-100));transform:translateY(-1px)}
+@media(max-width:950px){.detail-grid{grid-template-columns:1fr}.detail-grid .detail-player .scene-wrap{min-height:380px}}
