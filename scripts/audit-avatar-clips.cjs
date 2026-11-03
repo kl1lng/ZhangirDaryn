@@ -2,7 +2,7 @@
 // on the real Rocketbox skeleton for saved clip JSON files and reports where
 // the avatar's wrists cannot follow the recorded pose.
 // Usage: node scripts/audit-avatar-clips.cjs <dir-with-clip-json> [--csv out.csv]
-// Applies the player's pose-gap fill (--raw to skip). Limits: no hand-gap interpolation, smoothing,
+// Uses body_pose_world_landmarks like the player does (--no-world to ignore them). Applies the pose-gap fill (--raw to skip). Limits: no hand-gap interpolation, smoothing,
 // prepared-track corrections or finger posing.
 const fs=require('node:fs');
 const path=require('node:path');
@@ -43,6 +43,7 @@ function auditClip(clip){
   const {context,avatar,bones,rest,pos}=makeRig();
   const pose=clip.metadata?.body_pose_landmarks;
   if(!Array.isArray(pose)||!pose.length)return null;
+  const world=clip.metadata?.body_pose_world_landmarks;
   const track=process.argv.includes('--raw')?pose:context.interpolateShortPoseGaps(pose);
   context.activeBodyPose=track;context.activeSequence=clip.sequence;
   context.activeImageAspectRatio=Math.min(4,Math.max(.25,Number(clip.metadata.image_aspect_ratio)||1));
@@ -51,10 +52,12 @@ function auditClip(clip){
   const arm=side=>{const [a,b,c]=bones.slice(side*3,side*3+3);return pos(a).distanceTo(pos(b))+pos(b).distanceTo(pos(c))};
   const reach=[arm(0),arm(1)];
   const miss=[0,0],error=[[],[]],overReach=[0,0],speed=[[],[]],last=[null,null];
+  const inside=[],insideDepth=[];
   track.forEach((frame,index)=>{
     bones.forEach((bone,i)=>{bone.position.copy(rest[i].position);bone.quaternion.copy(rest[i].quaternion)});avatar.updateMatrixWorld(true);
     context.frame=frame;context.index=index;
-    const pt=i=>vm.runInContext(`bodyPosePoint(frame,${i},index,null,false)`,context);
+    context.worldFrame=process.argv.includes('--no-world')?null:(world?.[index]||null);
+    const pt=i=>vm.runInContext(`bodyPosePoint(frame,${i},index,worldFrame,false)`,context);
     const elbows=[pt(2),pt(3)],wrists=[pt(4),pt(5)];
     for(const side of [0,1]){
       const wrist=wrists[side],elbow=elbows[side];
@@ -67,6 +70,17 @@ function auditClip(clip){
       if(shoulder.distanceTo(wrist)>reach[side]*1.02)overReach[side]++;
       if(last[side])speed[side].push(got.distanceTo(last[side]));
       last[side]=got;
+      // Torso envelope = the same front shell solveRigArm uses for its wrist correction (ellipse, 19 cm deep).
+      // The wrist is corrected before IK, so check the points that are not: elbow, mid-forearm and the palm.
+      const elbowP=pos(bones[side*3+1]),other=pos(bones[(1-side)*3]),mid=elbowP.clone().add(got).multiplyScalar(.5);
+      const palm=got.clone().add(got.clone().sub(elbowP).normalize().multiplyScalar(.09));
+      const cx=(shoulder.x+other.x)/2,half=Math.max(.18,Math.abs(shoulder.x-other.x)*.5),torsoY=(shoulder.y+other.y)/2,zc=(shoulder.z+other.z)/2;
+      let deepest=0;
+      for(const point of [elbowP,mid,palm]){
+        const nx=(point.x-cx)/half;
+        if(Math.abs(nx)<1&&point.y<torsoY-.06&&point.y>torsoY-.72)deepest=Math.max(deepest,zc+.19*Math.sqrt(1-nx*nx)-point.z);
+      }
+      inside.push(deepest>.02?1:0);insideDepth.push(deepest);
     }
   });
   const n=track.length,all=[...error[0],...error[1]],spd=[...speed[0],...speed[1]];
@@ -75,6 +89,7 @@ function auditClip(clip){
     unreachable:(overReach[0]+overReach[1])/(2*n),
     errP95:percentile(all,.95),errMax:Math.max(0,...all),
     speedP95:percentile(spd,.95),jumps:spd.filter(v=>v>.12).length,
+    intoTorso:inside.length?inside.reduce((x,y)=>x+y,0)/inside.length:0,intoTorsoP95:percentile(insideDepth,.95),intoTorsoMax:Math.max(0,...insideDepth),
     worldPerImageUnit:placement.worldPerImageUnit,reach:reach[0]};
 }
 
@@ -88,8 +103,8 @@ for(const file of fs.readdirSync(dir).filter(name=>name.endsWith('.json'))){
 }
 rows.sort((a,b)=>(b.unreachable+b.poseWristMissing+b.jumps/b.frames)-(a.unreachable+a.poseWristMissing+a.jumps/a.frames));
 const fmt=v=>typeof v==='number'?(Number.isInteger(v)?v:v.toFixed(3)):v;
-const csv=['label,id,frames,poseWristMissing,unreachable,errP95_m,errMax_m,speedP95_m_per_frame,jumps,worldPerImageUnit']
-  .concat(rows.map(r=>[JSON.stringify(r.label),r.id,r.frames,fmt(r.poseWristMissing),fmt(r.unreachable),fmt(r.errP95),fmt(r.errMax),fmt(r.speedP95),r.jumps,fmt(r.worldPerImageUnit)].join(','))).join('\n');
+const csv=['label,id,frames,poseWristMissing,unreachable,errP95_m,errMax_m,speedP95_m_per_frame,jumps,intoTorso,intoTorsoP95_m,intoTorsoMax_m,worldPerImageUnit']
+  .concat(rows.map(r=>[JSON.stringify(r.label),r.id,r.frames,fmt(r.poseWristMissing),fmt(r.unreachable),fmt(r.errP95),fmt(r.errMax),fmt(r.speedP95),r.jumps,fmt(r.intoTorso),fmt(r.intoTorsoP95),fmt(r.intoTorsoMax),fmt(r.worldPerImageUnit)].join(','))).join('\n');
 const out=args.indexOf('--csv');if(out>=0)fs.writeFileSync(args[out+1],'﻿'+csv);
 const mean=key=>rows.reduce((s,r)=>s+r[key],0)/Math.max(1,rows.length);
-console.log(`clips=${rows.length}  meanPoseWristMissing=${fmt(mean('poseWristMissing'))}  meanUnreachable=${fmt(mean('unreachable'))}  meanErrP95=${fmt(mean('errP95'))}m  meanJumps=${fmt(mean('jumps'))}`);
+console.log(`clips=${rows.length}  meanPoseWristMissing=${fmt(mean('poseWristMissing'))}  meanUnreachable=${fmt(mean('unreachable'))}  meanErrP95=${fmt(mean('errP95'))}m  meanJumps=${fmt(mean('jumps'))}  meanIntoTorso=${fmt(mean('intoTorso'))}  clipsIntoTorso>10%=${rows.filter(r=>r.intoTorso>.1).length}  clipsDepth>5cm=${rows.filter(r=>r.intoTorsoP95>.05).length}`);
