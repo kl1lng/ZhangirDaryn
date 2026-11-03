@@ -1,5 +1,5 @@
 // Prepared local bone rotations. No source landmarks or bind offsets are edited.
-export const RIG_MOTION_VERSION='rocketbox-02-prepared-v3';
+export const RIG_MOTION_VERSION='rocketbox-02-prepared-v4';
 
 function createRigBake({bones,frameCount,fps,solveFrame,groups=[],tracked=()=>[]}){
   if(!bones.length||!Number.isInteger(frameCount)||frameCount<1||frameCount>18000||!Number.isFinite(fps)||fps<1||fps>240)

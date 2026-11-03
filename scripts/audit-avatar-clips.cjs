@@ -52,7 +52,7 @@ function auditClip(clip){
   const arm=side=>{const [a,b,c]=bones.slice(side*3,side*3+3);return pos(a).distanceTo(pos(b))+pos(b).distanceTo(pos(c))};
   const reach=[arm(0),arm(1)];
   const miss=[0,0],error=[[],[]],overReach=[0,0],speed=[[],[]],last=[null,null];
-  const inside=[],insideDepth=[];
+  const inside=[],insideDepth=[],elbowSpeed=[],lastElbow=[null,null];
   track.forEach((frame,index)=>{
     bones.forEach((bone,i)=>{bone.position.copy(rest[i].position);bone.quaternion.copy(rest[i].quaternion)});avatar.updateMatrixWorld(true);
     context.frame=frame;context.index=index;
@@ -75,11 +75,13 @@ function auditClip(clip){
       const elbowP=pos(bones[side*3+1]),other=pos(bones[(1-side)*3]),mid=elbowP.clone().add(got).multiplyScalar(.5);
       const palm=got.clone().add(got.clone().sub(elbowP).normalize().multiplyScalar(.09));
       const cx=(shoulder.x+other.x)/2,half=Math.max(.18,Math.abs(shoulder.x-other.x)*.5),torsoY=(shoulder.y+other.y)/2,zc=(shoulder.z+other.z)/2;
-      let deepest=0;
-      for(const point of [elbowP,mid,palm]){
+      if(lastElbow[side])elbowSpeed.push(elbowP.distanceTo(lastElbow[side]));lastElbow[side]=elbowP;
+      let deepest=0,which='';
+      for(const [name,point] of [['elbow',elbowP],['forearm',mid],['palm',palm]]){
         const nx=(point.x-cx)/half;
-        if(Math.abs(nx)<1&&point.y<torsoY-.06&&point.y>torsoY-.72)deepest=Math.max(deepest,zc+.19*Math.sqrt(1-nx*nx)-point.z);
+        if(Math.abs(nx)<1&&point.y<torsoY-.06&&point.y>torsoY-.72){const d=zc+.19*Math.sqrt(1-nx*nx)-point.z;if(d>deepest){deepest=d;which=name}}
       }
+      if(process.env.AUDIT_DEBUG&&deepest>.1){const f=v=>v.toFixed(2);console.log(`  frame ${index} side ${side} ${which} ${f(deepest)}m | targetWrist(${f(wrist.x)},${f(wrist.y)},${f(wrist.z)}) targetElbow(${f(elbow.x)},${f(elbow.y)},${f(elbow.z)}) shoulderZ ${f(zc)} torsoY ${f(torsoY)}`)}
       inside.push(deepest>.02?1:0);insideDepth.push(deepest);
     }
   });
@@ -89,6 +91,7 @@ function auditClip(clip){
     unreachable:(overReach[0]+overReach[1])/(2*n),
     errP95:percentile(all,.95),errMax:Math.max(0,...all),
     speedP95:percentile(spd,.95),jumps:spd.filter(v=>v>.12).length,
+    elbowJumps:elbowSpeed.filter(v=>v>.15).length,elbowP95:percentile(elbowSpeed,.95),
     intoTorso:inside.length?inside.reduce((x,y)=>x+y,0)/inside.length:0,intoTorsoP95:percentile(insideDepth,.95),intoTorsoMax:Math.max(0,...insideDepth),
     worldPerImageUnit:placement.worldPerImageUnit,reach:reach[0]};
 }
@@ -107,4 +110,4 @@ const csv=['label,id,frames,poseWristMissing,unreachable,errP95_m,errMax_m,speed
   .concat(rows.map(r=>[JSON.stringify(r.label),r.id,r.frames,fmt(r.poseWristMissing),fmt(r.unreachable),fmt(r.errP95),fmt(r.errMax),fmt(r.speedP95),r.jumps,fmt(r.intoTorso),fmt(r.intoTorsoP95),fmt(r.intoTorsoMax),fmt(r.worldPerImageUnit)].join(','))).join('\n');
 const out=args.indexOf('--csv');if(out>=0)fs.writeFileSync(args[out+1],'﻿'+csv);
 const mean=key=>rows.reduce((s,r)=>s+r[key],0)/Math.max(1,rows.length);
-console.log(`clips=${rows.length}  meanPoseWristMissing=${fmt(mean('poseWristMissing'))}  meanUnreachable=${fmt(mean('unreachable'))}  meanErrP95=${fmt(mean('errP95'))}m  meanJumps=${fmt(mean('jumps'))}  meanIntoTorso=${fmt(mean('intoTorso'))}  clipsIntoTorso>10%=${rows.filter(r=>r.intoTorso>.1).length}  clipsDepth>5cm=${rows.filter(r=>r.intoTorsoP95>.05).length}`);
+console.log(`clips=${rows.length}  meanPoseWristMissing=${fmt(mean('poseWristMissing'))}  meanUnreachable=${fmt(mean('unreachable'))}  meanErrP95=${fmt(mean('errP95'))}m  meanJumps=${fmt(mean('jumps'))}  meanIntoTorso=${fmt(mean('intoTorso'))}  clipsIntoTorso>10%=${rows.filter(r=>r.intoTorso>.1).length}  clipsDepth>5cm=${rows.filter(r=>r.intoTorsoP95>.05).length}  elbowJumps/clip=${fmt(mean('elbowJumps'))}  elbowSpeedP95=${fmt(mean('elbowP95'))}m`);

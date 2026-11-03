@@ -233,3 +233,22 @@ test('opening skips only the low idle lead-in and blends from the arms-down pose
   context.presentMotionWithOpening(38);assert.ok(bone.quaternion.angleTo(neutral)>0&&bone.quaternion.angleTo(neutral)<1,'arms lower smoothly');
   for(const frame of [41,44,50,55]){context.presentMotionWithOpening(frame);assert.ok(bone.quaternion.angleTo(neutral)<1e-9,'the seated rest pose never returns in the trailing frames')}
 });
+
+test('elbow stays outside the torso shell when the wrist is lifted in front of the chest',()=>{
+  const {context,avatar,bones,rest,pos}=makeRig();
+  const sL=pos(bones[0]),sR=pos(bones[3]),cx=(sL.x+sR.x)/2,half=Math.max(.18,Math.abs(sL.x-sR.x)*.5),torsoY=(sL.y+sR.y)/2,zc=(sL.z+sR.z)/2;
+  const front=nx=>zc+.19*Math.sqrt(Math.max(0,1-nx*nx));
+  for(const side of [0,1]){
+    const offset=side*3,shoulder=pos(bones[offset]);
+    for(const dx of [.02,.08,-.08]){
+      bones.forEach((bone,i)=>{bone.position.copy(rest[i].position);bone.quaternion.copy(rest[i].quaternion)});avatar.updateMatrixWorld(true);
+      context.previousArmPole=[null,null];
+      // A pose hint that points the elbow straight into the torso; wrist target is raised to the front shell by IK.
+      const hint=new THREE.Vector3(cx+(shoulder.x-cx)*.15,torsoY-.2,zc-.02);
+      const wrist=new THREE.Vector3(cx+dx,torsoY-.12,zc+.12);
+      context.solveRigArm(offset,offset+1,offset+2,hint,wrist,false);
+      const elbow=pos(bones[offset+1]),nx=(elbow.x-cx)/half;
+      if(Math.abs(nx)<1&&elbow.y<torsoY-.06&&elbow.y>torsoY-.72)assert.ok(elbow.z>=front(nx)-.02,`side ${side} dx ${dx}: elbow ${elbow.z.toFixed(3)} is behind the shell front ${front(nx).toFixed(3)}`);
+    }
+  }
+});

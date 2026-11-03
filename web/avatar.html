@@ -307,6 +307,22 @@ function solveRigArm(upperIndex,foreIndex,handIndex,elbowHint,wristTarget,allowC
     if(stable.lengthSq()>1e-6)bendDirection.normalize().lerp(stable.normalize(),1-bend/.04);
   }
   previousArmPole[side]=bendDirection.clone().normalize();
+  // The pole comes only from the pose hint, so with a wrist lifted in front of the torso the elbow can end up inside the shirt.
+  // Swing the pole outward and forward, in small steps, until the elbow clears the same front shell used for the wrist.
+  if(!allowContact&&bend>.02){
+    const outward=Math.sign(shoulder.x-otherShoulder.x)||1,frontOf=nx=>(shoulder.z+otherShoulder.z)/2+.19*Math.sqrt(Math.max(0,1-nx*nx));
+    const preferred=new THREE.Vector3(outward,-.15,.35);preferred.addScaledVector(axis,-preferred.dot(axis));
+    if(preferred.lengthSq()>1e-6){
+      preferred.normalize();const base=bendDirection.clone().normalize();
+      for(const amount of [0,.25,.5,.75,1]){
+        const direction=base.clone().lerp(preferred,amount).normalize();
+        const candidate=shoulder.clone().addScaledVector(axis,along).addScaledVector(direction,bend);
+        const nx=(candidate.x-centerX)/Math.max(.18,halfWidth);
+        bendDirection=direction;
+        if(!(Math.abs(nx)<1&&candidate.y<torsoY-.06&&candidate.y>torsoY-.72&&candidate.z<frontOf(nx)-.01))break;
+      }
+    }
+  }
   const elbow=shoulder.clone().addScaledVector(axis,along).addScaledVector(bendDirection.normalize(),bend);
   placeRigSegment(upperIndex,foreIndex,shoulder,elbow);
   placeRigSegment(foreIndex,handIndex,elbow,wrist)
