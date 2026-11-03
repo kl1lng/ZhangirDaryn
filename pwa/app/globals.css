@@ -151,3 +151,16 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 .chip-link{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:999px;background:rgb(var(--brand-50));border:1px solid rgb(var(--brand-200));color:var(--blue-strong);font-weight:700;transition:background-color .15s,transform .15s var(--ease-out)}
 .chip-link:hover{background:rgb(var(--brand-100));transform:translateY(-1px)}
 @media(max-width:950px){.detail-grid{grid-template-columns:1fr}.detail-grid .detail-player .scene-wrap{min-height:380px}}
+
+/* ---- install prompt ---- */
+.install-card{position:fixed;right:20px;bottom:20px;z-index:60;width:min(360px,calc(100vw - 24px));padding:16px;box-shadow:var(--shadow-lift);border-radius:16px;background:linear-gradient(160deg,rgb(var(--brand-50)),rgb(var(--brand-100)));border:1px solid rgb(var(--brand-200));display:grid;gap:12px}
+.install-text{display:grid;gap:4px;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.install-text strong{font-size:14px;color:var(--ink)}
+.install-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.install-actions .button{min-height:44px;padding:8px 14px;font-size:13px}
+.install-dismiss{min-height:44px;padding:8px 10px;border:0;background:none;color:var(--blue-strong);font-weight:600;font-size:13px;border-radius:8px}
+.install-dismiss:hover{background:rgb(255 255 255/.6)}
+@media(max-width:767px){.install-card{left:12px;right:12px;bottom:86px;width:auto}}
+
+.offline-pack{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 18px}
+.offline-pack .button{min-height:44px}
