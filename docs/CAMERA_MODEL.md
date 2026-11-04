@@ -18,7 +18,7 @@
 ```bash
 .venv-pwa/Scripts/python.exe scripts/slovo_handset.py          # data/slovo/handset.npz из сжатых координат Slovo
 .venv-pwa/Scripts/python.exe scripts/camera_train.py           # проверка на новых исполнителях
-.venv-pwa/Scripts/python.exe scripts/camera_train.py --final   # итоговая модель в pwa/public/camera/model.{json,bin}
+.venv-pwa/Scripts/python.exe scripts/camera_train.py --final   # итоговая модель в web/camera-model/model.{json,bin}
 ```
 Признаки в `scripts/camera_train.py` и `pwa/lib/camera-classifier.ts` должны совпадать; это проверяет
 `pwa/tests/camera-classifier.test.ts` (фикстуры из Python).

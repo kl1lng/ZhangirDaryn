@@ -39,8 +39,8 @@ test('the exported model format round-trips and the softmax output is a probabil
 });
 
 test('the shipped model gives the same top words as the Python forward pass',()=>{
- const meta=JSON.parse(readFileSync(new URL('../public/camera/model.json',import.meta.url),'utf8'));
- const bytes=readFileSync(new URL('../public/camera/model.bin',import.meta.url));
+ const meta=JSON.parse(readFileSync(new URL('../../web/camera-model/model.json',import.meta.url),'utf8'));
+ const bytes=readFileSync(new URL('../../web/camera-model/model.bin',import.meta.url));
  const model=parseModel(meta,bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
  const expected=JSON.parse(readFileSync(new URL('./fixtures/camera-model-expected.json',import.meta.url),'utf8')) as {top:{label:string;p:number}[]}[];
  fixtures.forEach((sample,i)=>{

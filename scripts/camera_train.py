@@ -4,7 +4,7 @@
 
 Data: data/slovo/handset.npz (scripts/slovo_handset.py) + scripts/slovo_kk_words.txt (the words shown on the site).
 Without --final the model is fitted on the training signers and scored on held-out signers; with --final it is fitted on
-everyone and written to pwa/public/camera/model.json + model.bin.
+everyone and written to web/camera-model/model.json + model.bin (copied to pwa/public/camera by pwa/scripts/prepare-camera.mjs).
 The feature code here must match pwa/lib/camera-classifier.ts exactly (see pwa/tests/camera-classifier.test.ts).
 """
 from __future__ import annotations
@@ -147,7 +147,7 @@ def main() -> None:
                 print(f"  confidence >= {t:.1f}: answers {sel.mean() * 100:4.0f}% of clips, top-1 correct {(top[sel, 0] == truth[sel]).mean() * 100:4.1f}%")
         return
 
-    out = ROOT / "pwa" / "public" / "camera"
+    out = ROOT / "web" / "camera-model"
     w1, w2 = model.coefs_
     b1, b2 = model.intercepts_
     blob = b"".join(a.astype("<f2").tobytes() for a in (w1, b1, w2, b2))
