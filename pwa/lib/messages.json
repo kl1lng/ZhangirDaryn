@@ -1470,5 +1470,13 @@
   "Русский жестовый язык: жесты из датасета Slovo (SaluteDevices, лицензия CC BY-SA). Это не казахский жестовый язык, носители КЖЯ их ещё не проверили.": [
     "Орыс ым тілі: Slovo деректер жинағынан алынған ымдар (SaluteDevices, CC BY-SA лицензиясы). Бұл қазақ ым тілі емес, ҚЫТ иелері оларды әлі тексермеген.",
     "Russian Sign Language: signs from the Slovo dataset (SaluteDevices, CC BY-SA license). This is not Kazakh Sign Language and native signers have not reviewed it yet."
+  ],
+  "Источники данных": [
+    "Деректер көздері",
+    "Data sources"
+  ],
+  "Раздел «Русский жестовый язык» построен на датасете Slovo (Kapitanov и др., SaluteDevices, 2023, github.com/ai-forever/slovo) по публичной лицензии с указанием авторства и сохранением условий (вариант CC BY-SA 4.0). Мы извлекли координаты кистей, позы и лица из исходных видео, выбрали по одной записи на слово и округлили значения. Исходные видео не публикуются. Это не казахский жестовый язык, носители КЖЯ эти жесты ещё не проверяли. Производные данные распространяются на тех же условиях лицензии.": [
+    "«Орыс ым тілі» бөлімі Slovo деректер жинағы негізінде жасалған (Kapitanov және т.б., SaluteDevices, 2023, github.com/ai-forever/slovo), авторлықты көрсету және шарттарды сақтау туралы жария лицензиясымен (CC BY-SA 4.0 нұсқасы). Біз бастапқы бейнелерден қол, дене және бет нүктелерінің координаттарын шығардық, әр сөзге бір жазба таңдадық және мәндерді дөңгелектедік. Бастапқы бейнелер жарияланбайды. Бұл қазақ ым тілі емес, ҚЫТ иелері бұл ымдарды әлі тексермеген. Туынды деректер лицензияның сол шарттарымен таратылады.",
+    "The “Russian Sign Language” section is built on the Slovo dataset (Kapitanov et al., SaluteDevices, 2023, github.com/ai-forever/slovo) under its public license with attribution and conditions reserved (a CC BY-SA 4.0 variant). We extracted hand, body and face landmarks from the original videos, selected one clip per word and rounded the values. The original videos are not published. This is not Kazakh Sign Language and native signers have not reviewed these signs yet. Derived data are shared under the same license terms."
   ]
 }
