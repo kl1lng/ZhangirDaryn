@@ -1,9 +1,6 @@
 import {test,expect} from './fixtures';
 import {readFile} from 'node:fs/promises';
 
-// Camera matching reads <NEXT_PUBLIC_LIBRARY_URL>/camera.json. A plain local dev server has no such library,
-// so these specs run only against a server started with it (set DOSYM_CAMERA_LIBRARY=1).
-const needsLibrary=()=>test.skip(!process.env.DOSYM_CAMERA_LIBRARY,'needs a server with NEXT_PUBLIC_LIBRARY_URL');
 async function fakeCamera(page:any,{delayed=false,denied=false}={}){
  await page.addInitScript(({delayed,denied}:{delayed:boolean;denied:boolean})=>{
   localStorage.setItem('dosym-locale','ru');
@@ -25,7 +22,7 @@ async function fakeCamera(page:any,{delayed=false,denied=false}={}){
  },{delayed,denied});
 }
 
-test('camera only starts on request, shows candidates and releases hardware on navigation',async({page})=>{needsLibrary();
+test('camera only starts on request, shows candidates and releases hardware on navigation',async({page})=>{
  await fakeCamera(page);await page.goto('/camera');
  expect(await page.evaluate(()=>(window as any).cameraCalls)).toBe(0);
  await page.getByRole('button',{name:'Включить камеру',exact:true}).click();
@@ -36,7 +33,7 @@ test('camera only starts on request, shows candidates and releases hardware on n
  expect(await page.evaluate(()=>(window as any).workerStopped)).toBe(true);
 });
 
-test('cancelling before permission resolves stops a late camera stream',async({page})=>{needsLibrary();
+test('cancelling before permission resolves stops a late camera stream',async({page})=>{
  await fakeCamera(page,{delayed:true});await page.goto('/camera');
  await page.getByRole('button',{name:'Включить камеру',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).cameraCalls)).toBe(1);
@@ -46,14 +43,14 @@ test('cancelling before permission resolves stops a late camera stream',async({p
  await expect(page.getByRole('button',{name:'Включить камеру',exact:true})).toBeEnabled();
 });
 
-test('permission denial is actionable and leaves no active worker',async({page})=>{needsLibrary();
+test('permission denial is actionable and leaves no active worker',async({page})=>{
  await fakeCamera(page,{denied:true});await page.goto('/camera');
  await page.getByRole('button',{name:'Включить камеру',exact:true}).click();
  await expect(page.getByText('Разрешите доступ к камере в настройках браузера.')).toBeVisible();
  expect(await page.evaluate(()=>(window as any).workerStopped)).toBe(true);
 });
 
-test('missing hands clear results and hiding the tab releases the camera',async({page})=>{needsLibrary();
+test('missing hands clear results and hiding the tab releases the camera',async({page})=>{
  await fakeCamera(page);await page.goto('/camera');
  await page.getByRole('button',{name:'Включить камеру',exact:true}).click();
  await expect(page.getByRole('link',{name:'А',exact:true})).toBeVisible();
@@ -65,7 +62,8 @@ test('missing hands clear results and hiding the tab releases the camera',async(
  await expect(page.getByRole('button',{name:'Включить камеру',exact:true})).toBeEnabled();
 });
 
-test('mobile camera view fits, translates, and does not load vision assets before start',async({page})=>{needsLibrary();
+test('mobile camera view fits, translates, and does not load vision assets before start',async({page})=>{
+ await page.addInitScript(()=>localStorage.removeItem('dosym-locale')); // this spec checks the Kazakh default
  await page.setViewportSize({width:360,height:800});
  const downloads:string[]=[];page.on('request',request=>{if(request.url().includes('/camera/'))downloads.push(request.url());});
  await page.goto('/camera');

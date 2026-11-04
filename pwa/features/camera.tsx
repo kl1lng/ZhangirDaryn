@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import {loadGestures} from '@/lib/catalog';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useI18n} from './locale';
 import {Icon} from './icons';
@@ -8,6 +9,8 @@ import type {CameraCandidate} from '@/lib/camera-match';
 const CONNECTIONS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
 export function Camera(){
  const {t}=useI18n();
+ const [known,setKnown]=useState<Map<string,string>>(new Map());
+ useEffect(()=>{loadGestures().then(rows=>setKnown(new Map(rows.map(g=>[g.label.trim().toLowerCase(),g.id])))).catch(()=>{});},[]);
  const [phase,setPhase]=useState('idle'),[error,setError]=useState(''),[hands,setHands]=useState(0),[collecting,setCollecting]=useState(true),[candidates,setCandidates]=useState<CameraCandidate[]>([]),[facing,setFacing]=useState('user');
  const video=useRef<HTMLVideoElement>(null),canvas=useRef<HTMLCanvasElement>(null),worker=useRef<Worker|null>(null),stream=useRef<MediaStream|null>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),watchdog=useRef<ReturnType<typeof setTimeout>|null>(null),generation=useRef(0);
  const stop=useCallback((update=true)=>{
@@ -30,7 +33,6 @@ export function Camera(){
   stop();setError('');
   if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia||!window.Worker||!window.createImageBitmap||!window.OffscreenCanvas){setError('Камера недоступна в этом браузере. Используйте современный браузер с HTTPS.');return;}
   const library=process.env.NEXT_PUBLIC_LIBRARY_URL;
-  if(!library){setError('Библиотека для камеры ещё не подключена.');return;}
   const session=generation.current;
   setPhase('model');
   let engine:Worker;
@@ -64,13 +66,13 @@ export function Camera(){
    }
    if(data.type==='result'){
     if(watchdog.current)clearTimeout(watchdog.current);setHands(data.hands);setCollecting(data.collecting);
-    setCandidates(previous=>JSON.stringify(previous.map(item=>item.id))===JSON.stringify(data.candidates.map((item:CameraCandidate)=>item.id))?previous:data.candidates);
+    setCandidates(previous=>JSON.stringify(previous.map(item=>item.id+item.label))===JSON.stringify(data.candidates.map((item:CameraCandidate)=>item.id+item.label))?previous:data.candidates);
     draw(data.landmarks);timer.current=setTimeout(capture,100);
    }
   };
   engine.onerror=()=>{if(current())fail('Не удалось запустить обработку камеры. Попробуйте другой браузер.');};
   watchdog.current=setTimeout(()=>{if(current())fail('Не удалось загрузить модель или библиотеку. Проверьте сеть и повторите.');},90000);
-  engine.postMessage({type:'init',referenceUrl:library.replace(/\/$/,'')+'/camera.json'});
+  engine.postMessage({type:'init',referenceUrl:library?library.replace(/\/$/,'')+'/camera.json':''});
  }
  const active=phase!=='idle';
  const status=phase==='model'?'Загружаем модель кистей…':phase==='references'?'Подготавливаем примеры жестов…':phase==='permission'?'Разрешите доступ к камере в окне браузера.':phase==='running'?(hands===0?'Руки не видны в кадре.':collecting?'Покажите жест: собираем движение…':candidates.length?'Похожие примеры найдены.':'Жест не определён.'):'Камера выключена.';
@@ -79,7 +81,7 @@ export function Camera(){
    <p className="camera-instructions">{t('Сядьте по центру, держите кисти целиком в кадре и покажите один жест. Мимика в этом режиме не учитывается.')}</p>
    <div className={'camera-preview '+(facing==='user'?'camera-mirrored':'')}><video ref={video} muted playsInline aria-label={t('Изображение с вашей камеры')}/><canvas ref={canvas} aria-hidden="true"/>{phase!=='running'&&<div className="camera-placeholder"><Icon name="camera" size={40}/><span>{t(status)}</span></div>}</div>
    <div className="camera-controls"><button type="button" className={'button '+(active?'secondary':'primary')} onClick={()=>active?stop():start()}><Icon name="camera" size={18}/>{active?t('Остановить камеру'):t('Включить камеру')}</button><label>{t('Камера')}<select value={facing} disabled={active} onChange={event=>setFacing(event.target.value)}><option value="user">{t('Передняя')}</option><option value="environment">{t('Задняя')}</option></select></label></div>
-   <div className="camera-results" role="status" aria-live="polite"><h2>{t('Похожие примеры')}</h2><p>{t(status)}</p>{candidates.length>0&&<ul>{candidates.map(candidate=><li key={candidate.id}><Link href={'/gestures/'+candidate.id}>{candidate.label}</Link></li>)}</ul>}</div>
+   <div className="camera-results" role="status" aria-live="polite"><h2>{t('Похожие примеры')}</h2><p>{t(status)}</p>{candidates.length>0&&<ul>{candidates.map(candidate=>{const target=candidate.id||known.get(candidate.label.trim().toLowerCase())||'';return <li key={candidate.id+candidate.label}>{target?<Link href={'/gestures/'+target}>{candidate.label}</Link>:<span>{candidate.label}</span>}</li>;})}</ul>}</div>
    {error&&<p className="error" role="alert">{t(error)}</p>}
    <p className="camera-privacy">{t('Видео не записывается и не отправляется на сервер. При скрытии вкладки камера останавливается. Модель и примеры загружаются при включении.')}</p>
    <p className="camera-privacy">{t('Показаны похожие образцы, а не подтверждённый перевод. Проверьте результат по демонстрации жеста в словаре.')}</p>

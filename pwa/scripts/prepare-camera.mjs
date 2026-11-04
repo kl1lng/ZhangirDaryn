@@ -16,6 +16,8 @@ await writeFile(path.join(output,'hand_landmarker.task'),model);
 await writeFile(path.join(output,'vision.js'),'var exports={};\n'+await readFile(path.join(dependency,'vision_bundle.cjs'),'utf8'));
 const matcher=await readFile(path.join(root,'pwa/lib/camera-match.ts'),'utf8');
 await writeFile(path.join(output,'matcher.js'),ts.transpileModule(matcher,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText);
+const classifier=await readFile(path.join(root,'pwa/lib/camera-classifier.ts'),'utf8');
+await writeFile(path.join(output,'classifier.js'),ts.transpileModule(classifier,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText);
 await copyFile(path.join(root,'web/camera-worker.js'),path.join(output,'worker.js'));
 await writeFile(path.join(output,'NOTICE.txt'),'MediaPipe Tasks Vision 0.10.32 and Hand Landmarker: Google / Apache-2.0.\nhttps://github.com/google-ai-edge/mediapipe\nModel SHA-256: '+checksum+'\n');
 console.log('Prepared local camera runtime and verified hand model.');

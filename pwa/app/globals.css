@@ -172,3 +172,14 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 
 /* The slogan lies over the avatar legs; keep it only on the empty placeholder. */
 .scene-wrap iframe~.scene-note{display:none}
+
+/* ---- mobile top bar: logo instead of the breadcrumb, quiet connection pill ---- */
+.topbar-brand{display:none;align-items:center;gap:8px;font-size:18px;letter-spacing:-.03em;color:var(--ink)}
+.topbar-brand img{display:block;height:22px;width:auto}
+@media(max-width:767px){
+ .topbar-brand{display:flex}.topbar .breadcrumb{display:none}
+ .topbar{justify-content:space-between}
+ .connection:not(.offline){display:none}
+ .mobile-account{width:44px;height:44px;border-radius:50%;background:rgb(var(--brand-50));color:var(--blue-strong)}
+ :root .language-switcher{max-width:122px;min-height:44px}
+}
