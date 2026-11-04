@@ -8,24 +8,39 @@ self.exports={};
 importScripts('/camera/classifier.js');
 const cameraClassifier=self.exports;
 let detector=null,references=[],frames=[],lastMatch=-Infinity,missing=0,wordModel=null,timed=[];
-let latestCandidates=[],lastTop='';
+let latestCandidates=[],recentTop=[],lastDebug={model:false,frames:0,top:[]},stamps=[];
 // Words come from the trained model; the example library answers only for a held, still hand (letters), so that every
 // hand shape is not forced onto the nearest letter.
 function recognise(now){
- const window=timed.filter(item=>now-item.time<=1600);
- if(wordModel&&window.length>=10){
-  const guesses=cameraClassifier.classify(wordModel,cameraClassifier.gestureFeatures(window.map(item=>item.frame),wordModel.steps),3);
-  const best=guesses.filter(item=>item.probability>=wordModel.threshold);
-  if(best.length){const stable=best[0].label===lastTop;lastTop=best[0].label;if(stable)return best.map(item=>({id:'',label:item.label,distance:1-item.probability}));return [];}
-  lastTop='';
+ lastDebug.model=Boolean(wordModel);
+ if(wordModel){
+  // The camera does not know where a gesture starts: try three window lengths and keep the most confident answer.
+  let best=null;
+  for(const span of [1000,1600,2400]){
+   const window=timed.filter(item=>now-item.time<=span);
+   if(window.length<8)continue;
+   const guesses=cameraClassifier.classify(wordModel,cameraClassifier.gestureFeatures(window.map(item=>item.frame),wordModel.steps),3);
+   if(!best||guesses[0].probability>best[0].probability)best=guesses;
+   lastDebug.frames=window.length;
+  }
+  if(best){
+   lastDebug.top=best.map(item=>item.label+' '+Math.round(item.probability*100)+'%');
+   recentTop.push(best[0].label);if(recentTop.length>3)recentTop.shift();
+   const agreed=recentTop.filter(label=>label===best[0].label).length>=2;
+   const sure=best[0].probability>=wordModel.threshold&&agreed;
+   // Always offer the best guesses while hands are in view; weak ones are marked so the page can show them as uncertain.
+   const shown=best.filter(item=>item.probability>=.06);
+   if(shown.length)return shown.map(item=>({id:'',label:item.label,distance:1-item.probability,weak:!sure||item.probability<wordModel.threshold}));
+  }
  }
+ // A held, still hand is a letter: only then the example library answers, so that moving gestures are not forced onto letters.
  if(references.length&&frames.length>=12&&isHeldStill(frames))return cameraMatcher.rankExamples(frames,references);
  return [];
 }
 function isHeldStill(rows){
  const recent=rows.slice(-12);let travel=0;
  for(let i=1;i<recent.length;i++)for(const base of [0,63])travel+=Math.hypot(recent[i][base]-recent[i-1][base],recent[i][base+1]-recent[i-1][base+1]);
- return travel/recent.length<.006;
+ return travel/recent.length<.02;
 }
 self.onmessage=async({data})=>{
  if(data.type==='init'){
@@ -60,10 +75,12 @@ self.onmessage=async({data})=>{
   const result=detector.detectForVideo(bitmap,data.timestamp);
   const row=cameraMatcher.handFeatures(result.landmarks,result.handedness);
   const hasHands=row.some(value=>value!==0);
-  if(!hasHands){missing++;latestCandidates=[];if(missing>=3){frames=[];timed=[];}}
-  else {missing=0;frames.push(row);if(frames.length>30)frames.shift();timed.push({time:data.timestamp,frame:cameraClassifier.frameFromHands(result.landmarks,bitmap.width/bitmap.height)});while(timed.length&&data.timestamp-timed[0].time>2000)timed.shift();}
+  if(!hasHands){missing++;latestCandidates=[];if(missing>=3){frames=[];timed=[];recentTop=[];}}
+  else {missing=0;frames.push(row);if(frames.length>30)frames.shift();timed.push({time:data.timestamp,frame:cameraClassifier.frameFromHands(result.landmarks,bitmap.width/bitmap.height)});while(timed.length&&data.timestamp-timed[0].time>2600)timed.shift();}
   if(hasHands&&data.timestamp-lastMatch>=400){lastMatch=data.timestamp;latestCandidates=recognise(data.timestamp);}
-  self.postMessage({type:'result',hands:result.landmarks.length,landmarks:result.landmarks.map(hand=>hand.map(({x,y})=>({x,y}))),candidates:hasHands?latestCandidates:[],collecting:frames.length<12});
+  stamps.push(data.timestamp);while(stamps.length&&data.timestamp-stamps[0]>2000)stamps.shift();
+  const debug={...lastDebug,fps:Math.round(stamps.length/2),references:references.length,size:bitmap.width+'x'+bitmap.height};
+  self.postMessage({type:'result',debug,hands:result.landmarks.length,landmarks:result.landmarks.map(hand=>hand.map(({x,y})=>({x,y}))),candidates:hasHands?latestCandidates:[],collecting:frames.length<12});
  }catch{self.postMessage({type:'error',code:'detection'});}
  finally{bitmap?.close();}
 };

@@ -10,6 +10,7 @@ const CONNECTIONS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],
 export function Camera(){
  const {t}=useI18n();
  const [known,setKnown]=useState<Map<string,string>>(new Map());
+ const [debug,setDebug]=useState<{model:boolean;frames:number;top:string[];fps:number;references:number;size:string}|null>(null);
  useEffect(()=>{loadGestures().then(rows=>setKnown(new Map(rows.map(g=>[g.label.trim().toLowerCase(),g.id])))).catch(()=>{});},[]);
  const [phase,setPhase]=useState('idle'),[error,setError]=useState(''),[hands,setHands]=useState(0),[collecting,setCollecting]=useState(true),[candidates,setCandidates]=useState<CameraCandidate[]>([]),[facing,setFacing]=useState('user');
  const video=useRef<HTMLVideoElement>(null),canvas=useRef<HTMLCanvasElement>(null),worker=useRef<Worker|null>(null),stream=useRef<MediaStream|null>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),watchdog=useRef<ReturnType<typeof setTimeout>|null>(null),generation=useRef(0);
@@ -66,6 +67,7 @@ export function Camera(){
    }
    if(data.type==='result'){
     if(watchdog.current)clearTimeout(watchdog.current);setHands(data.hands);setCollecting(data.collecting);
+    if(data.debug)setDebug(data.debug);
     setCandidates(previous=>JSON.stringify(previous.map(item=>item.id+item.label))===JSON.stringify(data.candidates.map((item:CameraCandidate)=>item.id+item.label))?previous:data.candidates);
     draw(data.landmarks);timer.current=setTimeout(capture,100);
    }
@@ -81,8 +83,8 @@ export function Camera(){
    <p className="camera-instructions">{t('Сядьте по центру, держите кисти целиком в кадре и покажите один жест. Мимика в этом режиме не учитывается.')}</p>
    <div className={'camera-preview '+(facing==='user'?'camera-mirrored':'')}><video ref={video} muted playsInline aria-label={t('Изображение с вашей камеры')}/><canvas ref={canvas} aria-hidden="true"/>{phase!=='running'&&<div className="camera-placeholder"><Icon name="camera" size={40}/><span>{t(status)}</span></div>}</div>
    <div className="camera-controls"><button type="button" className={'button '+(active?'secondary':'primary')} onClick={()=>active?stop():start()}><Icon name="camera" size={18}/>{active?t('Остановить камеру'):t('Включить камеру')}</button><label>{t('Камера')}<select value={facing} disabled={active} onChange={event=>setFacing(event.target.value)}><option value="user">{t('Передняя')}</option><option value="environment">{t('Задняя')}</option></select></label></div>
-   <div className="camera-results" role="status" aria-live="polite"><h2>{t('Похожие примеры')}</h2><p>{t(status)}</p>{candidates.length>0&&<ul>{candidates.map(candidate=>{const target=candidate.id||known.get(candidate.label.trim().toLowerCase())||'';return <li key={candidate.id+candidate.label}>{target?<Link href={'/gestures/'+target}>{candidate.label}</Link>:<span>{candidate.label}</span>}</li>;})}</ul>}</div>
-   {error&&<p className="error" role="alert">{t(error)}</p>}
+   <div className="camera-results" role="status" aria-live="polite"><h2>{t('Похожие примеры')}</h2><p>{t(status)}</p>{candidates.length>0&&<ul>{candidates.map(candidate=>{const target=candidate.id||known.get(candidate.label.trim().toLowerCase())||'';return <li key={candidate.id+candidate.label} className={candidate.weak?'weak':''}>{target?<Link href={'/gestures/'+target}>{candidate.label}</Link>:<span>{candidate.label}</span>}</li>;})}</ul>}</div>
+   {debug&&typeof location!=='undefined'&&new URLSearchParams(location.search).has('debug')&&<pre className="camera-debug">{JSON.stringify(debug,null,1)}</pre>}{error&&<p className="error" role="alert">{t(error)}</p>}
    <p className="camera-privacy">{t('Видео не записывается и не отправляется на сервер. При скрытии вкладки камера останавливается. Модель и примеры загружаются при включении.')}</p>
    <p className="camera-privacy">{t('Показаны похожие образцы, а не подтверждённый перевод. Проверьте результат по демонстрации жеста в словаре.')}</p>
   </section></>;

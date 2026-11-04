@@ -183,3 +183,7 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
  .mobile-account{width:44px;height:44px;border-radius:50%;background:rgb(var(--brand-50));color:var(--blue-strong)}
  :root .language-switcher{max-width:122px;min-height:44px}
 }
+
+.camera-results li.weak a,.camera-results li.weak span{opacity:.7;border-style:dashed}
+
+.camera-debug{margin:12px 0 0;padding:12px;border-radius:10px;background:#0f1a2d;color:#cfe0ff;font-size:12px;overflow:auto}

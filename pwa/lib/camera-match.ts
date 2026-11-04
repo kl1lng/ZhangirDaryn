@@ -2,7 +2,7 @@
 type Point={x:number;y:number;z:number};
 export type CameraReference={id:string;label:string;sequence:number[][]};
 type Prepared={id:string;label:string;sample:number[][]};
-export type CameraCandidate={id:string;label:string;distance:number};
+export type CameraCandidate={id:string;label:string;distance:number;weak?:boolean};
 const STEPS=16,MAX_DISTANCE=.22;
 const visible=(row:number[],side:number)=>{
  const start=side*63;

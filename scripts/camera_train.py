@@ -90,6 +90,20 @@ def mirrored(sample: np.ndarray, aspect_width: float = 1.0) -> np.ndarray:
     return out
 
 
+def live_window(sample: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """What the camera really sees: a cut of the gesture plus still frames before/after, at a lower frame rate."""
+    count = len(sample)
+    start = int(rng.integers(0, max(1, count // 5)))
+    end = count - int(rng.integers(0, max(1, count // 5)))
+    window = sample[start:max(end, start + 8)]
+    if len(window) > 8 and rng.random() < 0.5:
+        window = window[::2]
+    before = int(rng.integers(0, 9))
+    after = int(rng.integers(0, 9))
+    parts = [np.repeat(window[:1], before, axis=0), window, np.repeat(window[-1:], after, axis=0)]
+    return np.concatenate([p for p in parts if len(p)])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--final", action="store_true")
@@ -110,14 +124,18 @@ def main() -> None:
     print(len(keep), "recordings,", len(classes), "classes")
 
     started = time.time()
-    X, y, is_train = [], [], []
+    rng = np.random.default_rng(11)
+    X, y, is_train, real = [], [], [], []
     for i in keep:
         base = data[i]
-        for variant in (base, mirrored(base)):
-            X.append(features(variant, aspect[i]))
-            y.append(index[kk[i]])
-            is_train.append(bool(train[i]))
-    X, y, is_train = np.stack(X), np.array(y), np.array(is_train)
+        variants = [base, live_window(base, rng), live_window(base, rng)]
+        for k, variant in enumerate(variants):
+            for flip in (False, True):
+                X.append(features(mirrored(variant) if flip else variant, aspect[i]))
+                y.append(index[kk[i]])
+                is_train.append(bool(train[i]))
+                real.append(k == 1 and not flip)  # one live-like, unmirrored variant per recording is used for scoring
+    X, y, is_train, real = np.stack(X), np.array(y), np.array(is_train), np.array(real)
     print("features", X.shape, f"{time.time() - started:.0f}s")
 
     fit_mask = np.ones(len(X), bool) if args.final else is_train
@@ -130,18 +148,14 @@ def main() -> None:
     print(f"fitted in {time.time() - started:.0f}s")
 
     if not args.final:
-        test = ~is_train
-        # score only the real (not mirrored) held-out recordings
-        real = np.zeros(len(X), bool)
-        real[0::2] = True
-        test &= real
+        test = ~is_train & real
         p = model.predict_proba(scaler.transform(X[test]))
         top = np.argsort(-p, axis=1)[:, :5]
         truth = y[test]
-        print(f"held-out signers: top-1 {(top[:, 0] == truth).mean() * 100:.1f}%  "
-              f"top-5 {np.mean([truth[i] in top[i] for i in range(len(truth))]) * 100:.1f}%  ({test.sum()} recordings, {len(classes)} words)")
+        print(f"held-out signers, live-like windows: top-1 {(top[:, 0] == truth).mean() * 100:.1f}%  "
+              f"top-5 {np.mean([truth[i] in top[i] for i in range(len(truth))]) * 100:.1f}%  ({test.sum()} windows, {len(classes)} words)")
         confidence = p.max(1)
-        for t in (0.2, 0.3, 0.4, 0.5, 0.6):
+        for t in (0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5):
             sel = confidence >= t
             if sel.any():
                 print(f"  confidence >= {t:.1f}: answers {sel.mean() * 100:4.0f}% of clips, top-1 correct {(top[sel, 0] == truth[sel]).mean() * 100:4.1f}%")
