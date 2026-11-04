@@ -252,3 +252,15 @@ test('elbow stays outside the torso shell when the wrist is lifted in front of t
     }
   }
 });
+
+test('a hand held low in front of the body does not make the elbow stick out sideways',()=>{
+  const {context,avatar,bones,rest,pos}=makeRig();
+  const shoulder=pos(bones[0]);
+  bones.forEach((bone,i)=>{bone.position.copy(rest[i].position);bone.quaternion.copy(rest[i].quaternion)});avatar.updateMatrixWorld(true);
+  context.previousArmPole=[null,null];
+  // Real frame of a library clip: the noisy pose puts the elbow level with the shoulder, far to the side, while the wrist is low.
+  const hint=new THREE.Vector3(shoulder.x+.30,shoulder.y-.07,shoulder.z+.07),wrist=new THREE.Vector3(shoulder.x+.15,shoulder.y-.16,shoulder.z+.24);
+  context.solveRigArm(0,1,2,hint,wrist,false);
+  const upper=pos(bones[1]).sub(shoulder).normalize(),abduction=Math.acos(Math.max(-1,Math.min(1,-upper.y)))*180/Math.PI;
+  assert.ok(abduction<=62,`upper arm is ${abduction.toFixed(0)} degrees away from the body`);
+});

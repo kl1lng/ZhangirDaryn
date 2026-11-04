@@ -307,21 +307,32 @@ function solveRigArm(upperIndex,foreIndex,handIndex,elbowHint,wristTarget,allowC
     if(stable.lengthSq()>1e-6)bendDirection.normalize().lerp(stable.normalize(),1-bend/.04);
   }
   previousArmPole[side]=bendDirection.clone().normalize();
-  // The pole comes only from the pose hint, so with a wrist lifted in front of the torso the elbow can end up inside the shirt.
-  // Swing the pole outward and forward, in small steps, until the elbow clears the same front shell used for the wrist.
+  // The pole comes only from a noisy single-camera pose hint, so the elbow can end up inside the shirt, behind the back or
+  // sticking far out to the side. Try the elbow positions around the shoulder-wrist axis and take the most natural one:
+  // keep the data's choice unless it breaks the body (cost grows with the angle away from the data).
   if(!allowContact&&bend>.02){
-    const outward=Math.sign(shoulder.x-otherShoulder.x)||1,frontOf=nx=>(shoulder.z+otherShoulder.z)/2+.19*Math.sqrt(Math.max(0,1-nx*nx));
-    const preferred=new THREE.Vector3(outward,-.15,.35);preferred.addScaledVector(axis,-preferred.dot(axis));
-    if(preferred.lengthSq()>1e-6){
-      preferred.normalize();const base=bendDirection.clone().normalize();
-      for(const amount of [0,.25,.5,.75,1]){
-        const direction=base.clone().lerp(preferred,amount).normalize();
-        const candidate=shoulder.clone().addScaledVector(axis,along).addScaledVector(direction,bend);
-        const nx=(candidate.x-centerX)/Math.max(.18,halfWidth);
-        bendDirection=direction;
-        if(!(Math.abs(nx)<1&&candidate.y<torsoY-.06&&candidate.y>torsoY-.72&&candidate.z<frontOf(nx)-.01))break;
-      }
+    const base=bendDirection.clone().normalize(),outwardSide=Math.sign(shoulder.x-otherShoulder.x)||1;
+    const frontOf=nx=>(shoulder.z+otherShoulder.z)/2+.19*Math.sqrt(Math.max(0,1-nx*nx));
+    const handsLow=wristTarget.y<shoulder.y+.05,limit=THREE.MathUtils.degToRad(55);
+    let best=base,bestCost=Infinity;
+    for(let step=0;step<24;step++){
+      const turn=((step%2?1:-1)*Math.ceil(step/2))*Math.PI/12,direction=base.clone().applyAxisAngle(axis,turn);
+      const candidate=shoulder.clone().addScaledVector(axis,along).addScaledVector(direction,bend);
+      const nx=(candidate.x-centerX)/Math.max(.18,halfWidth);
+      let cost=Math.abs(turn)*.25;
+      // keep the elbow where it was in the previous frame unless there is a reason to move it
+      if(previous)cost+=direction.angleTo(previous)*.5;
+      // inside the torso shell
+      if(Math.abs(nx)<1&&candidate.y<torsoY-.06&&candidate.y>torsoY-.72)cost+=Math.max(0,frontOf(nx)-.01-candidate.z)*30;
+      // behind the back
+      cost+=Math.max(0,shoulder.z-.05-candidate.z)*30;
+      // upper arm far from the body while the hand is low
+      if(handsLow){const upper=candidate.clone().sub(shoulder).normalize(),abduction=Math.acos(THREE.MathUtils.clamp(-upper.y,-1,1));cost+=Math.max(0,abduction-limit)*3}
+      // elbow above the shoulder line while the hand is low
+      if(handsLow)cost+=Math.max(0,candidate.y-shoulder.y)*6;
+      if(cost<bestCost){bestCost=cost;best=direction}
     }
+    bendDirection=best;previousArmPole[side]=best.clone().normalize();
   }
   const elbow=shoulder.clone().addScaledVector(axis,along).addScaledVector(bendDirection.normalize(),bend);
   placeRigSegment(upperIndex,foreIndex,shoulder,elbow);
