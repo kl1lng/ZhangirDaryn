@@ -45,7 +45,7 @@ function auditClip(clip){
   if(!Array.isArray(pose)||!pose.length)return null;
   const world=clip.metadata?.body_pose_world_landmarks;
   const track=process.argv.includes('--raw')?pose:context.interpolateShortPoseGaps(pose);
-  context.activeBodyPose=track;context.activeSequence=clip.sequence;
+  context.activeBodyPose=track;context.activeSequence=clip.sequence;context.activeBodyPoseWorld=process.argv.includes('--no-world')?null:(world||null);
   context.activeImageAspectRatio=Math.min(4,Math.max(.25,Number(clip.metadata.image_aspect_ratio)||1));
   vm.runInContext('calibrateMotion(activeSequence)',context);
   const placement=context.motionPlacement;
@@ -82,7 +82,7 @@ function auditClip(clip){
       let deepest=0,which='';
       for(const [name,point] of [['elbow',elbowP],['forearm',mid],['palm',palm]]){
         const nx=(point.x-cx)/half;
-        if(Math.abs(nx)<1&&point.y<torsoY-.06&&point.y>torsoY-.72){const d=zc+.19*Math.sqrt(1-nx*nx)-point.z;if(d>deepest){deepest=d;which=name}}
+        if(Math.abs(nx)<1&&point.y<torsoY+.1&&point.y>torsoY-.72){const d=zc+.19*Math.sqrt(1-nx*nx)-point.z;if(d>deepest){deepest=d;which=name}}
       }
       if(process.env.AUDIT_DEBUG&&deepest>.1){const f=v=>v.toFixed(2);console.log(`  frame ${index} side ${side} ${which} ${f(deepest)}m | targetWrist(${f(wrist.x)},${f(wrist.y)},${f(wrist.z)}) targetElbow(${f(elbow.x)},${f(elbow.y)},${f(elbow.z)}) shoulderZ ${f(zc)} torsoY ${f(torsoY)}`)}
       inside.push(deepest>.02?1:0);insideDepth.push(deepest);

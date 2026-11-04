@@ -264,3 +264,16 @@ test('a hand held low in front of the body does not make the elbow stick out sid
   const upper=pos(bones[1]).sub(shoulder).normalize(),abduction=Math.acos(Math.max(-1,Math.min(1,-upper.y)))*180/Math.PI;
   assert.ok(abduction<=62,`upper arm is ${abduction.toFixed(0)} degrees away from the body`);
 });
+
+test('a hand at shoulder or neck height is kept in front of the body instead of sinking into the shoulder',()=>{
+  const {context,avatar,bones,rest,pos}=makeRig();
+  const sL=pos(bones[0]),sR=pos(bones[3]),cx=(sL.x+sR.x)/2,torsoY=(sL.y+sR.y)/2,zc=(sL.z+sR.z)/2;
+  const front=nx=>zc+.19*Math.sqrt(Math.max(0,1-nx*nx));
+  bones.forEach((bone,i)=>{bone.position.copy(rest[i].position);bone.quaternion.copy(rest[i].quaternion)});avatar.updateMatrixWorld(true);
+  context.previousArmPole=[null,null];
+  // The pose says the wrist is on the opposite shoulder, level with it and flush with the chest plane.
+  const wrist=new THREE.Vector3(cx-.12,torsoY+.02,zc+.02),hint=new THREE.Vector3(cx+.3,torsoY-.1,zc+.05);
+  context.solveRigArm(0,1,2,hint,wrist,false);
+  const got=pos(bones[2]),nx=(got.x-cx)/Math.max(.18,Math.abs(sL.x-sR.x)*.5);
+  assert.ok(got.z>=front(nx)-.02,`wrist z ${got.z.toFixed(3)} is behind the shell front ${front(nx).toFixed(3)}`);
+});

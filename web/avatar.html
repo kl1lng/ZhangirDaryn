@@ -282,7 +282,7 @@ function solveRigArm(upperIndex,foreIndex,handIndex,elbowHint,wristTarget,allowC
   const halfWidth=Math.abs(shoulder.x-otherShoulder.x)*.5;
   const torsoY=(shoulder.y+otherShoulder.y)/2;
   const nx=(wristTarget.x-centerX)/Math.max(.18,halfWidth);
-  if(!allowContact&&Math.abs(nx)<1&&wristTarget.y<torsoY-.06&&wristTarget.y>torsoY-.72){
+  if(!allowContact&&Math.abs(nx)<1&&wristTarget.y<torsoY+.1&&wristTarget.y>torsoY-.72){
     const front=(shoulder.z+otherShoulder.z)/2+.19*Math.sqrt(1-nx*nx);
     wristTarget.z=Math.max(wristTarget.z,front);
   }
