@@ -41,3 +41,14 @@ test('dictionary lists shared words with capital initials, one filter letter per
  await expect(page.locator('.gesture-row h2')).toHaveText(['Сүт']);
  await expect(page.getByText(/не казахский|Орыс ым тілі/)).toHaveCount(0);
 });
+
+test('a word without a sign is spelled with letter signs inside a sentence',async({page})=>{
+ const letters=['М','Е','Н'].map((label,i)=>({id:`letter-${i}`,label,language:'kk-KZ',metadata:{}}));
+ await page.route('**/api/gestures',route=>route.fulfill({json:[...own,...letters]}));
+ for(const row of letters)await page.route(`**/gestures/${row.id}/motion`,route=>route.fulfill({headers:{'Access-Control-Allow-Origin':'*'},json:motion(row.id,row.label)}));
+ await page.goto('/');
+ await page.getByLabel('Текст для показа жестами').fill('мен су');
+ await page.getByRole('button',{name:'Показать жесты',exact:true}).click();
+ await expect(page.frameLocator('.player iframe').locator('#received')).toHaveText('М,Е,Н,Су',{timeout:8000});
+ await expect(page.getByText('Показано по буквам: мен')).toBeVisible();
+});

@@ -167,3 +167,5 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 
 .chips.hints{margin:8px 0 4px}
 .chips.hints button{border-color:rgb(var(--brand-300));background:rgb(var(--brand-50));color:var(--blue-strong);font-weight:600}
+
+.notice-spelled{margin-top:12px;padding:10px 14px;border-radius:12px;background:rgb(var(--brand-50));border:1px solid rgb(var(--brand-200));color:var(--blue-strong);font-size:13px;font-weight:600}

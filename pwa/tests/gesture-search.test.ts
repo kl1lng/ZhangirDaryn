@@ -37,3 +37,13 @@ test('long phrases win, missing text stays missing and dictionary searches Latin
  assert.ok(searchGesture('Өрік','örik'));
  assert.equal(matchGesture('hello',labels).matches.length,0);
 });
+
+test('inflected words find their dictionary form and the order of a sentence is kept',()=>{
+ const rows=[{id:'1',label:'Кітап'},{id:'2',label:'Су',aliases:['вода']},{id:'3',label:'Бала',aliases:['ребенок','дети']}];
+ assert.deepEqual(resolvePhrase('кітаптар',rows).matches.map(row=>row.id),['1']);
+ assert.deepEqual(resolvePhrase('кітапты',rows).matches.map(row=>row.id),['1']);
+ assert.deepEqual(resolvePhrase('воды',rows).matches.map(row=>row.id),['2']);
+ const sentence=resolvePhrase('бала мен су',rows);
+ assert.deepEqual(sentence.order.map(item=>item.entry?.id||item.word),['3','мен','2']);
+ assert.deepEqual(resolvePhrase('кіт',rows).matches,[],'short fragments must not match by stem');
+});
