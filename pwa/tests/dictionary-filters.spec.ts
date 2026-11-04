@@ -26,3 +26,11 @@ test('searching a missing word offers to record that sign',async({page})=>{
  await expect(page.getByText('Жеста «Рахмет» пока нет')).toBeVisible();
  await expect(page.getByRole('link',{name:'Записать этот жест'})).toHaveAttribute('href','/upload');
 });
+
+test('typing shows word suggestions that complete the current word',async({page})=>{
+ await page.route('**/api/gestures',route=>route.fulfill({json:['Сәлем','Автобус','Күн'].map((label,i)=>({id:String(i),label,language:'kk-KZ',metadata:{}}))}));
+ await page.goto('/');
+ await page.getByLabel('Текст для показа жестами').fill('Мен Сәл');
+ await page.getByRole('group',{name:'Подсказки слов'}).getByRole('button',{name:'Сәлем'}).click();
+ await expect(page.getByLabel('Текст для показа жестами')).toHaveValue('Мен Сәлем ');
+});

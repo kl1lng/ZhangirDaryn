@@ -164,3 +164,6 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 
 .offline-pack{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 18px}
 .offline-pack .button{min-height:44px}
+
+.chips.hints{margin:8px 0 4px}
+.chips.hints button{border-color:rgb(var(--brand-300));background:rgb(var(--brand-50));color:var(--blue-strong);font-weight:600}
