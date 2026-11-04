@@ -3,7 +3,7 @@
 Slovo is a Russian Sign Language (RSL) dataset, CC BY-SA 4.0 variant (see data/slovo/license_en_us.pdf).
 Nothing here touches data/motion_library.sqlite3 or the public PWA database.
 
-  .venv-pwa\Scripts\python.exe scripts/slovo_extract.py [--limit N] [--words word1,word2] [--db PATH]
+  .venv-pwa/Scripts/python.exe scripts/slovo_extract.py [--limit N] [--words word1,word2] [--db PATH]
 Candidates come from data/slovo/candidates.json (3 per word); every candidate is imported so the best one can be
 chosen after extraction by hand coverage. Safe to re-run: clips for an already imported video are skipped.
 """

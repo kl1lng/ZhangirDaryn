@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type {Gesture} from './types';
 let client:SupabaseClient|null=null;
 let clientPromise:Promise<SupabaseClient|null>|null=null;
 export class ApiError extends Error{constructor(message:string,public status:number){super(message);}}
@@ -19,12 +20,16 @@ export async function token(){
   if(sessionStorage.getItem('dosym-auth-provider')!=='supabase')return '';
   const result=await (await supabase())?.auth.getSession();return result?.data.session?.access_token||'';
 }
+// Optional preview library of another sign language (Russian, from Slovo). Unset in production until it is reviewed.
+export const RSL_URL=(process.env.NEXT_PUBLIC_RSL_LIBRARY_URL||'').replace(/\/$/,'');
+export async function rslCatalog():Promise<Gesture[]>{if(!RSL_URL)return [];try{const response=await fetch(RSL_URL+'/catalog.json');if(!response.ok)return [];return await response.json() as Gesture[];}catch{return [];}}
 export async function api<T>(path:string,options:RequestInit={}):Promise<T>{
   const publicMotion=/^gestures\/[a-zA-Z0-9_-]+\/motion$/.test(path);
   const auth=publicMotion||path==='auth/config'?'':await token();
   const direct=publicMotion||path==='auth/local'||auth.startsWith('local:');
   const library=process.env.NEXT_PUBLIC_LIBRARY_URL;
-  const endpoint=publicMotion&&library?library.replace(/\/$/,'')+'/'+path.split('/')[1]+'.json':direct?(process.env.NEXT_PUBLIC_UPLOAD_ORIGIN||'http://127.0.0.1:8765')+'/'+path:'/api/'+path;
+  const rsl=publicMotion&&path.startsWith('gestures/rsl-')&&RSL_URL;
+  const endpoint=rsl?RSL_URL+'/'+path.split('/')[1]+'.json':publicMotion&&library?library.replace(/\/$/,'')+'/'+path.split('/')[1]+'.json':direct?(process.env.NEXT_PUBLIC_UPLOAD_ORIGIN||'http://127.0.0.1:8765')+'/'+path:'/api/'+path;
   const response=await fetch(endpoint,{...options,cache:'no-store',headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+auth}:{}),...options.headers}});
   if(!response.ok){let message='Не удалось выполнить действие.';try{const data=await response.json();message=data.error||data.detail?.[0]?.msg||message;}catch{}throw new ApiError(message,response.status);}
   return response.json();

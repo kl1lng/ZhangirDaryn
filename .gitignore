@@ -67,3 +67,6 @@ test-results/
 # Local scratch (not part of the app)
 .slidebuild/
 output/
+
+# Local preview of the Russian Sign Language (Slovo) library; not part of the repository
+pwa/public/rsl-preview/

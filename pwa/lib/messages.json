@@ -1454,5 +1454,21 @@
   "Подсказки слов": [
     "Сөз ұсыныстары",
     "Word suggestions"
+  ],
+  "Жестовый язык": [
+    "Ым тілі",
+    "Sign language"
+  ],
+  "Русский жестовый язык": [
+    "Орыс ым тілі",
+    "Russian Sign Language"
+  ],
+  "Русский жестовый язык · Не проверен носителями": [
+    "Орыс ым тілі · Тіл иелері тексермеген",
+    "Russian Sign Language · Not reviewed by native signers"
+  ],
+  "Русский жестовый язык: жесты из датасета Slovo (SaluteDevices, лицензия CC BY-SA). Это не казахский жестовый язык, носители КЖЯ их ещё не проверили.": [
+    "Орыс ым тілі: Slovo деректер жинағынан алынған ымдар (SaluteDevices, CC BY-SA лицензиясы). Бұл қазақ ым тілі емес, ҚЫТ иелері оларды әлі тексермеген.",
+    "Russian Sign Language: signs from the Slovo dataset (SaluteDevices, CC BY-SA license). This is not Kazakh Sign Language and native signers have not reviewed it yet."
   ]
 }
