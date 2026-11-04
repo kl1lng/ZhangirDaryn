@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 
 test.beforeEach(async({page})=>{await page.addInitScript(()=>localStorage.setItem('dosym-locale','ru'));});
 test('explicitly downloaded public motion opens without a network',async({page,context})=>{

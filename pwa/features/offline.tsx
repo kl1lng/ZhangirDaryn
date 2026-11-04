@@ -15,7 +15,7 @@ export function OfflineProvider({children}:{children:React.ReactNode}){const {t}
   const local=await operation('readonly',store=>store.getAll()) as Motion[];
   if(navigator.onLine&&local.length){
    try{const response=await fetch('/api/gestures',{cache:'no-store'});if(!response.ok)throw new Error();const catalog=await response.json();
-    for(const id of staleOfflineIds(local,catalog)){await operation('readwrite',store=>store.delete(id));if('caches'in window){const cache=await caches.open(CACHE);await cache.delete('/gestures/'+id);}}
+    for(const id of staleOfflineIds(local,catalog).filter(id=>!id.startsWith('rsl-'))){await operation('readwrite',store=>store.delete(id));if('caches'in window){const cache=await caches.open(CACHE);await cache.delete('/gestures/'+id);}}
    }catch{/* Failed connectivity is not proof of revocation. */}
   }
   await refresh();

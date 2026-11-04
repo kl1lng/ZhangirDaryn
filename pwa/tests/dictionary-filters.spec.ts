@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test('dictionary combines type, alphabetic order and search',async({page})=>{
  await page.addInitScript(()=>localStorage.setItem('dosym-locale','ru'));
  await page.route('**/api/gestures',route=>route.fulfill({json:['Я','Ә','А','Сәлем','Автобус','Қайырлы таң'].map((label,i)=>({id:String(i),label,language:'kk-KZ',metadata:{}}))}));

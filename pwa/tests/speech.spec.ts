@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 
 test('speech appends final text once, keeps interim text separate and stops on navigation',async({page})=>{
  await page.addInitScript(()=>{

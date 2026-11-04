@@ -39,9 +39,23 @@ def round_deep(value):
     return value
 
 
+def read_words():
+    """scripts/slovo_kk_words.txt: 'русское = Қазақша | алиас, алиас' (A1-A2 vocabulary only)."""
+    words = {}
+    for line in (ROOT / "scripts" / "slovo_kk_words.txt").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        ru, rest = (part.strip() for part in line.split("=", 1))
+        kk, _, aliases = rest.partition("|")
+        words[ru.casefold()] = (kk.strip(), [a.strip() for a in aliases.split(",") if a.strip()])
+    return words
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=str(ROOT / "data" / "slovo" / "export" / "rsl"))
+    parser.add_argument("--all", action="store_true", help="export every word with its Russian label (hidden/unreviewed set)")
     args = parser.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -72,24 +86,47 @@ def main() -> int:
             - 0.5 * abs(clip["frames"] - median_frames) / max(median_frames, 1) - (1 if clip["frames"] < 15 else 0)
 
     catalog, total_bytes = [], 0
+    visible = None if args.all else read_words()
+    if visible is not None:
+        unknown = sorted(ru for ru in visible if not any(w.casefold() == ru for w in clips))
+        print("mapped words not found in Slovo:", unknown)
+    chosen = {}
     for word, items in sorted(clips.items()):
+        if visible is not None and (word.casefold() not in visible or len(word) < 2):
+            continue
         median_frames = st.median(c["frames"] for c in items)
         best = max(items, key=lambda c: quality(c, median_frames))
+        chosen[word] = (best, quality(best, median_frames))
+    by_label = {}
+    for word, (best, score) in chosen.items():
+        label, aliases = (word, []) if visible is None else visible[word.casefold()]
+        label = label[:1].upper() + label[1:]
+        entry = by_label.get(label.casefold())
+        if entry is None or score > entry["score"]:
+            merged = (entry["aliases"] if entry else set()) | set(aliases) | {word}
+            by_label[label.casefold()] = dict(label=label, best=best, score=score, aliases=merged)
+        else:
+            entry["aliases"] |= set(aliases) | {word}
+    for entry in sorted(by_label.values(), key=lambda e: e["label"].casefold()):
+        word, best = entry["label"], entry["best"]
         array = np.load(io.BytesIO(zlib.decompress(best["blob"])), allow_pickle=False).astype(np.float32)
         public = {k: v for k, v in best["meta"].items() if k in PUBLIC_METADATA}
         public.update(fps=best["fps"], shape=list(array.shape), schema_version=1)
         public = {k: round_deep(v) for k, v in public.items()}
         sequence = round_deep(array.astype(float).tolist())
-        body = {"label": word, "language": "ru-RU", "sign_language": "rsl", "sequence": sequence, "fps": best["fps"],
-                "metadata": public}
+        body = {"label": word, "language": "ru-RU" if visible is None else "kk-KZ", "sign_language": "rsl", "sequence": sequence,
+                "fps": best["fps"], "metadata": public}
         version = hashlib.sha256(json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
         motion_id = f"rsl-{version[:12]}"
         motion = {"id": motion_id, **body, "version": version}
         text = json.dumps(motion, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
         (out / f"{motion_id}.json").write_text(text, encoding="utf-8")
         total_bytes += len(text.encode())
-        catalog.append({"id": motion_id, "label": word, "language": "ru-RU", "sign_language": "rsl", "review": "pending",
-                        "metadata": {"fps": best["fps"], "shape": list(array.shape)}, "version": version})
+        item = {"id": motion_id, "label": word, "language": body["language"], "sign_language": "rsl", "review": "pending",
+                "metadata": {"fps": best["fps"], "shape": list(array.shape)}, "version": version}
+        if entry["aliases"]:
+            item["aliases"] = sorted(entry["aliases"])
+        catalog.append(item)
     (out / "catalog.json").write_text(json.dumps(catalog, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     (out / "ATTRIBUTION.md").write_text(
         "# Russian Sign Language preview library\n\n"

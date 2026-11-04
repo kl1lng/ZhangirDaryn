@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 import {readFile} from 'node:fs/promises';
 
 // Camera matching reads <NEXT_PUBLIC_LIBRARY_URL>/camera.json. A plain local dev server has no such library,
