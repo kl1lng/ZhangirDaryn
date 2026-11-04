@@ -20,8 +20,8 @@ export async function token(){
   if(sessionStorage.getItem('dosym-auth-provider')!=='supabase')return '';
   const result=await (await supabase())?.auth.getSession();return result?.data.session?.access_token||'';
 }
-// Optional preview library of another sign language (Russian, from Slovo). Unset in production until it is reviewed.
-export const RSL_URL=(process.env.NEXT_PUBLIC_RSL_LIBRARY_URL||'').replace(/\/$/,'');
+// Library of another sign language (Russian, from Slovo), bundled in public/rsl. Set NEXT_PUBLIC_RSL_LIBRARY_URL to another base URL, or to an empty string to switch it off.
+export const RSL_URL=(process.env.NEXT_PUBLIC_RSL_LIBRARY_URL??'/rsl').replace(/\/$/,'');
 export async function rslCatalog():Promise<Gesture[]>{if(!RSL_URL)return [];try{const response=await fetch(RSL_URL+'/catalog.json');if(!response.ok)return [];return await response.json() as Gesture[];}catch{return [];}}
 export async function api<T>(path:string,options:RequestInit={}):Promise<T>{
   const publicMotion=/^gestures\/[a-zA-Z0-9_-]+\/motion$/.test(path);
