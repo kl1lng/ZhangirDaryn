@@ -77,6 +77,7 @@ function auditClip(clip){
       const cx=(shoulder.x+other.x)/2,half=Math.max(.18,Math.abs(shoulder.x-other.x)*.5),torsoY=(shoulder.y+other.y)/2,zc=(shoulder.z+other.z)/2;
       if(process.env.AUDIT_ABD){const up=elbowP.clone().sub(shoulder).normalize(),deg=Math.acos(Math.max(-1,Math.min(1,-up.y)))*180/Math.PI;if(deg>70){const f2=v=>v.toFixed(2);console.log(`  frame ${index} side ${side} abduction ${deg.toFixed(0)}deg wristTarget(${f2(wrist.x)},${f2(wrist.y)},${f2(wrist.z)}) elbowTarget(${f2(elbow.x)},${f2(elbow.y)},${f2(elbow.z)}) elbowGot(${f2(elbowP.x)},${f2(elbowP.y)},${f2(elbowP.z)}) shoulder(${f2(shoulder.x)},${f2(shoulder.y)},${f2(shoulder.z)})`)}}
       {const upper=elbowP.clone().sub(shoulder).normalize();abduction.push(Math.acos(Math.max(-1,Math.min(1,-upper.y)))*180/Math.PI);}
+      if(process.env.AUDIT_ELBOW&&lastElbow[side]&&elbowP.distanceTo(lastElbow[side])>.15){const f2=v=>v.toFixed(2);console.log(`  frame ${index} side ${side} elbow jumped ${elbowP.distanceTo(lastElbow[side]).toFixed(2)}m from(${f2(lastElbow[side].x)},${f2(lastElbow[side].y)},${f2(lastElbow[side].z)}) to(${f2(elbowP.x)},${f2(elbowP.y)},${f2(elbowP.z)}) wristTarget(${f2(wrist.x)},${f2(wrist.y)},${f2(wrist.z)}) hint(${f2(elbow.x)},${f2(elbow.y)},${f2(elbow.z)})`)}
       if(lastElbow[side])elbowSpeed.push(elbowP.distanceTo(lastElbow[side]));lastElbow[side]=elbowP;
       let deepest=0,which='';
       for(const [name,point] of [['elbow',elbowP],['forearm',mid],['palm',palm]]){
