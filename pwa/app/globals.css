@@ -347,4 +347,17 @@ body{background-color:var(--paper);background-image:radial-gradient(rgb(var(--br
 .training-summary strong{font-weight:800;color:var(--blue-strong)}
 @media(max-width:560px){.material-row>svg:first-child{display:none}.material-status{padding-left:0}}
 .listen-live.note p{font-size:15px;font-weight:600;line-height:1.5}
+/* ---- profile, policy, detail ---- */
+.profile-head{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+.profile-head h2{margin:0 0 2px}.profile-head p{margin:0;color:var(--muted);font-size:14px}
+.profile-avatar{flex:none;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:26px;font-weight:800;color:#fff;background:linear-gradient(150deg,rgb(var(--brand-500)),rgb(var(--accent-600)));box-shadow:0 10px 22px -12px rgb(var(--brand-900)/.6)}
+.profile-card .badge{margin:0 0 14px}
+.profile-card hr{border-top-color:rgb(var(--brand-100))}
+.prose{max-width:820px;padding:12px 28px 20px;border-radius:20px;box-shadow:var(--shadow-card);counter-reset:policy}
+.prose h2{display:flex;align-items:center;gap:12px;margin:0;padding:22px 0 6px;font-size:18px;font-weight:800;border-top:1px solid var(--line);counter-increment:policy}
+.prose h2:first-child{border-top:0}
+.prose h2::before{content:counter(policy,decimal-leading-zero);flex:none;font:700 12px ui-monospace,SFMono-Regular,Consolas,monospace;padding:5px 8px;border-radius:8px;background:rgb(var(--brand-50));border:1px solid rgb(var(--brand-100));color:rgb(var(--accent-600))}
+.prose p{margin:0 0 6px 50px;font-size:15px;line-height:1.7}
+.back-button{min-height:44px;gap:8px}
+@media(max-width:560px){.prose{padding:8px 16px 16px}.prose p{margin-left:0}}
 @media(max-width:767px){.sidebar nav{grid-template-columns:repeat(6,1fr)!important}.nav-item{font-size:11px}}
