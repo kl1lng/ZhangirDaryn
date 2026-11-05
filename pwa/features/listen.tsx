@@ -99,17 +99,25 @@ export function Listen(){
  },[stop,acquireWake,releaseWake]);
 
  const state:Record<Line['status'],string>={waiting:t('В очереди'),playing:t('Показывается'),done:t('Показано'),skipped:t('Пропущено'),nosign:t('Нет жестов')};
+ const languages:[string,string][]=[['kk-KZ','Қазақша'],['ru-RU','Русский'],['en-US','English']];
+ const label=listening?t("Остановить прослушивание"):t("Начать слушать");
+ const live=interim||(listening?t('Слушаю…'):error?t(error):supported===false?t('Голосовой ввод недоступен в этом браузере.'):t('Пока ничего не слышно.'));
  return <><PageHeading title={t("Слушаю и показываю")} text={t("Включите микрофон: речь вокруг превратится в жесты.")} aside={<span className="section-tag"><Icon name="mic" size={17}/>{t("Прямой показ")}</span>}/>
   <div className="translate-layout"><section className="compose-panel listen-panel">
-   <div className="listen-controls"><button type="button" className={'button '+(listening?'secondary':'primary')} aria-pressed={listening} disabled={supported===false} onClick={()=>listening?stop():start()}><Icon name="mic" size={20}/>{listening?t("Остановить прослушивание"):t("Начать слушать")}</button>
-    <label>{t("Язык речи")}<select value={language} disabled={listening} onChange={event=>setLanguage(event.target.value)}><option value="kk-KZ">Қазақша</option><option value="ru-RU">Русский</option><option value="en-US">English</option></select></label></div>
-   <div className="listen-live" role="status" aria-live="polite">{interim||(listening?t('Слушаю…'):error?t(error):supported===false?t('Голосовой ввод недоступен в этом браузере.'):t('Пока ничего не слышно.'))}</div>
+   <div className={'listen-stage'+(listening?' is-live':'')}>
+    <button type="button" className="mic-orb" aria-pressed={listening} disabled={supported===false} onClick={()=>listening?stop():start()}>
+     <span className="orb-ring" aria-hidden="true"/><span className="orb-ring r2" aria-hidden="true"/>
+     <span className="orb-core" aria-hidden="true"><Icon name="mic" size={34}/></span>
+     <span className="sr-only">{label}</span>
+    </button>
+    <p className="stage-title" aria-hidden="true">{listening?t("Слушаю…"):label}</p>
+    <div className="seg" role="radiogroup" aria-label={t("Язык речи")}>{languages.map(([code,name])=><button type="button" role="radio" aria-checked={language===code} key={code} className={language===code?'on':''} disabled={listening} onClick={()=>setLanguage(code)}>{name}</button>)}</div>
+   </div>
+   <div className={'listen-live'+(interim?' has-text':'')} role="status" aria-live="polite"><span className="eyebrow">{t("Сейчас слышу")}</span><p>{live}</p></div>
    {error&&listening&&<p className="error" role="alert">{t(error)}</p>}
    {skipped>0&&<div className="warning" role="status">{t("Речь быстрее показа: пропущено фраз")}: {skipped}. {t("Показываю последние.")}</div>}
-   <h3 className="listen-title">{t("Недавние фразы")}</h3>
-   {lines.length?<ol className="listen-journal">{lines.map(line=><li key={line.id} className={'line-'+line.status}><span className="line-text">{line.text}{line.spelled.length>0&&<em>{t("по буквам")}: {line.spelled.join(', ')}</em>}</span><span className="line-state">{state[line.status]}</span></li>)}</ol>:<p className="muted">{t("Пока ничего не слышно.")}</p>}
-   {lines.length>0&&<button type="button" className="button secondary" onClick={()=>{setLines([]);setSkipped(0);}}>{t("Очистить")}</button>}
-   <p className="small muted">{t("Речь распознаёт браузер: в Chrome и Edge звук обрабатывает облачная служба браузера. Мы ничего не записываем и не сохраняем.")}</p>
-   <div className="honest-note"><Icon name="shield" size={19}/><p>{t("Показ отдельных жестов не заменяет полноценный перевод предложения. Понятность движения требует проверки носителями КЖЯ.")}</p></div>
+   <div className="listen-head"><h3 className="listen-title">{t("Недавние фразы")}</h3>{lines.length>0&&<button type="button" className="link-button" onClick={()=>{setLines([]);setSkipped(0);}}>{t("Очистить")}</button>}</div>
+   {lines.length?<ol className="listen-journal">{lines.map(line=><li key={line.id} className={'line-'+line.status}><span className="line-dot" aria-hidden="true"/><span className="line-text">{line.text}{line.spelled.length>0&&<em>{t("по буквам")}: {line.spelled.join(', ')}</em>}</span><span className="line-state">{state[line.status]}</span></li>)}</ol>:<div className="listen-empty"><Icon name="hand" size={26}/><p>{t("Здесь появятся услышанные фразы, а рядом их показ жестами.")}</p></div>}
+   <details className="listen-note"><summary><Icon name="shield" size={17}/>{t("О приватности и точности")}</summary><p>{t("Речь распознаёт браузер: в Chrome и Edge звук обрабатывает облачная служба браузера. Мы ничего не записываем и не сохраняем.")}</p><p>{t("Показ отдельных жестов не заменяет полноценный перевод предложения. Понятность движения требует проверки носителями КЖЯ.")}</p></details>
   </section><Player motions={motions} onEnded={finished} defaultSpeed="1.5" label="Прямой показ"/></div></>;
 }
