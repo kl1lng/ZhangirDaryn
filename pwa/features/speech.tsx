@@ -33,11 +33,13 @@ export function SpeechInput({onFinal}:{onFinal:(value:string)=>void}){
   recognition.onerror=event=>{if(event.error==='aborted')return;setError(event.error==='not-allowed'||event.error==='service-not-allowed'?'Разрешите доступ к микрофону в настройках браузера.':event.error==='no-speech'?'Речь не обнаружена. Попробуйте ещё раз.':'Не удалось распознать речь. Проверьте подключение и выбранный язык.');};
   try{recognition.start();}catch{active.current=null;setListening(false);setError('Не удалось запустить микрофон. Попробуйте ещё раз.');}
  }
+ const languages:[string,string][]=[['kk-KZ','Қазақша'],['ru-RU','Русский'],['en-US','English']];
+ const message=interim||(listening?t('Слушаю…'):error?t(error):'');
  return <div className="speech-input">
-  <strong>{locale==='kk'?'Сөйлеуді мәтінге айналдыру':locale==='en'?'Speech to text':'Речь в текст'}</strong>
-  <div className="speech-controls"><button type="button" className="button secondary" disabled={!supported} aria-pressed={listening} onClick={start}><Icon name="mic" size={18}/>{listening?t('Остановить голосовой ввод'):t('Начать голосовой ввод')}</button>
-  <label>{t('Язык речи')}<select value={language} disabled={listening} onChange={event=>setLanguage(event.target.value)}><option value="kk-KZ">Қазақша</option><option value="ru-RU">Русский</option><option value="en-US">English</option></select></label></div>
-  <div role="status" aria-live="polite">{interim|| (listening?t('Слушаю…'):error?t(error):supported===false?t('Голосовой ввод недоступен в этом браузере.'):'')}</div>
+  <span className="eyebrow">{locale==='kk'?'Сөйлеуді мәтінге айналдыру':locale==='en'?'Speech to text':'Речь в текст'}</span>
+  <div className="speech-controls"><button type="button" className={'button '+(listening?'primary':'secondary')} disabled={!supported} aria-pressed={listening} onClick={start}><Icon name="mic" size={18}/>{listening?t('Остановить голосовой ввод'):t('Начать голосовой ввод')}</button>
+  <div className="seg" role="radiogroup" aria-label={t('Язык речи')}>{languages.map(([code,name])=><button type="button" role="radio" aria-checked={language===code} key={code} className={language===code?'on':''} disabled={listening} onClick={()=>setLanguage(code)}>{name}</button>)}</div></div>
+  <div role="status" aria-live="polite" className="speech-status">{message}{!message&&supported===false&&t('Голосовой ввод недоступен в этом браузере.')}</div>
   {supported===false&&<p>{locale==='kk'?'Дауыс енгізу үшін Chrome немесе Edge браузерін ашыңыз.':locale==='en'?'Open Chrome or Edge to use voice input.':'Для голосового ввода откройте сайт в Chrome или Edge.'}</p>}
   <small>{t('Аудио может обрабатываться сервисом вашего браузера. Результат можно исправить перед показом жестов.')}</small>
  </div>;

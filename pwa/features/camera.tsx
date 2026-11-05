@@ -78,14 +78,19 @@ export function Camera(){
  }
  const active=phase!=='idle';
  const status=phase==='model'?'Загружаем модель кистей…':phase==='references'?'Подготавливаем примеры жестов…':phase==='permission'?'Разрешите доступ к камере в окне браузера.':phase==='running'?(hands===0?'Руки не видны в кадре.':collecting?'Покажите жест: собираем движение…':candidates.length?'Похожие примеры найдены.':'Жест не определён.'):'Камера выключена.';
+ const live=phase==='running';
  return <><div className="page-heading"><div><h1>{t('Камера: жесты в текст')}</h1><p>{t('Экспериментальное сравнение с примерами библиотеки.')}</p></div><span className="section-tag">{t('Эксперимент')}</span></div>
-  <section className="camera-panel">
-   <p className="camera-instructions">{t('Сядьте по центру, держите кисти целиком в кадре и покажите один жест. Мимика в этом режиме не учитывается.')}</p>
-   <div className={'camera-preview '+(facing==='user'?'camera-mirrored':'')}><video ref={video} muted playsInline aria-label={t('Изображение с вашей камеры')}/><canvas ref={canvas} aria-hidden="true"/>{phase!=='running'&&<div className="camera-placeholder"><Icon name="camera" size={40}/><span>{t(status)}</span></div>}</div>
-   <div className="camera-controls"><button type="button" className={'button '+(active?'secondary':'primary')} onClick={()=>active?stop():start()}><Icon name="camera" size={18}/>{active?t('Остановить камеру'):t('Включить камеру')}</button><label>{t('Камера')}<select value={facing} disabled={active} onChange={event=>setFacing(event.target.value)}><option value="user">{t('Передняя')}</option><option value="environment">{t('Задняя')}</option></select></label></div>
-   <div className="camera-results" role="status" aria-live="polite"><h2>{t('Похожие примеры')}</h2><p>{t(status)}</p>{candidates.length>0&&<ul>{candidates.map(candidate=>{const target=candidate.id||known.get(candidate.label.trim().toLowerCase())||'';return <li key={candidate.id+candidate.label} className={candidate.weak?'weak':''}>{target?<Link href={'/gestures/'+target}>{candidate.label}</Link>:<span>{candidate.label}</span>}</li>;})}</ul>}</div>
-   {debug&&typeof location!=='undefined'&&new URLSearchParams(location.search).has('debug')&&<pre className="camera-debug">{JSON.stringify(debug,null,1)}</pre>}{error&&<p className="error" role="alert">{t(error)}</p>}
-   <p className="camera-privacy">{t('Видео не записывается и не отправляется на сервер. При скрытии вкладки камера останавливается. Модель и примеры загружаются при включении.')}</p>
-   <p className="camera-privacy">{t('Показаны похожие образцы, а не подтверждённый перевод. Проверьте результат по демонстрации жеста в словаре.')}</p>
-  </section></>;
+  <div className="camera-layout">
+   <section className="camera-panel">
+    <div className={'camera-preview '+(facing==='user'?'camera-mirrored':'')}><video ref={video} muted playsInline aria-label={t('Изображение с вашей камеры')}/><canvas ref={canvas} aria-hidden="true"/>{live&&<span className="camera-pill on" aria-hidden="true"><i/>{t('Идёт показ')}</span>}{!live&&<div className="camera-placeholder"><Icon name="camera" size={40}/><span>{t(status)}</span></div>}</div>
+    <div className="camera-controls"><button type="button" className={'button '+(active?'secondary':'primary')} onClick={()=>active?stop():start()}><Icon name="camera" size={18}/>{active?t('Остановить камеру'):t('Включить камеру')}</button>
+     <div className="seg" role="radiogroup" aria-label={t('Камера')}>{([['user','Передняя'],['environment','Задняя']] as const).map(([value,name])=><button type="button" role="radio" aria-checked={facing===value} key={value} className={facing===value?'on':''} disabled={active} onClick={()=>setFacing(value)}>{t(name)}</button>)}</div></div>
+    {debug&&typeof location!=='undefined'&&new URLSearchParams(location.search).has('debug')&&<pre className="camera-debug">{JSON.stringify(debug,null,1)}</pre>}{error&&<p className="error" role="alert">{t(error)}</p>}
+   </section>
+   <aside className="camera-side">
+    <div className="camera-results" role="status" aria-live="polite"><span className="eyebrow">{t('Похожие примеры')}</span><p className="camera-status">{t(status)}</p>{candidates.length>0?<ol>{candidates.map((candidate,index)=>{const target=candidate.id||known.get(candidate.label.trim().toLowerCase())||'';return <li key={candidate.id+candidate.label} className={candidate.weak?'weak':''}><span className="rank" aria-hidden="true">{index+1}</span>{target?<Link href={'/gestures/'+target}>{candidate.label}</Link>:<span className="rank-label">{candidate.label}</span>}</li>;})}</ol>:<div className="listen-empty"><Icon name="hand" size={26}/><p>{t('Покажите жест: собираем движение…')}</p></div>}</div>
+    <ol className="camera-tips"><li><b>01</b>{t('Сядьте по центру')}</li><li><b>02</b>{t('Держите кисти целиком в кадре')}</li><li><b>03</b>{t('Покажите один жест')}</li></ol>
+    <details className="listen-note"><summary><Icon name="shield" size={17}/>{t('О приватности и точности')}</summary><p>{t('Мимика в этом режиме не учитывается.')}</p><p>{t('Видео не записывается и не отправляется на сервер. При скрытии вкладки камера останавливается. Модель и примеры загружаются при включении.')}</p><p>{t('Показаны похожие образцы, а не подтверждённый перевод. Проверьте результат по демонстрации жеста в словаре.')}</p></details>
+   </aside>
+  </div></>;
 }

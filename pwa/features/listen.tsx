@@ -113,7 +113,7 @@ export function Listen(){
     <p className="stage-title" aria-hidden="true">{listening?t("Слушаю…"):label}</p>
     <div className="seg" role="radiogroup" aria-label={t("Язык речи")}>{languages.map(([code,name])=><button type="button" role="radio" aria-checked={language===code} key={code} className={language===code?'on':''} disabled={listening} onClick={()=>setLanguage(code)}>{name}</button>)}</div>
    </div>
-   <div className={'listen-live'+(interim?' has-text':'')} role="status" aria-live="polite"><span className="eyebrow">{t("Сейчас слышу")}</span><p>{live}</p></div>
+   <div className={'listen-live'+(interim?' has-text':'')+(!interim&&!listening&&(error||supported===false)?' note':'')} role="status" aria-live="polite"><span className="eyebrow">{t("Сейчас слышу")}</span><p>{live}</p></div>
    {error&&listening&&<p className="error" role="alert">{t(error)}</p>}
    {skipped>0&&<div className="warning" role="status">{t("Речь быстрее показа: пропущено фраз")}: {skipped}. {t("Показываю последние.")}</div>}
    <div className="listen-head"><h3 className="listen-title">{t("Недавние фразы")}</h3>{lines.length>0&&<button type="button" className="link-button" onClick={()=>{setLines([]);setSkipped(0);}}>{t("Очистить")}</button>}</div>
