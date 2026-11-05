@@ -15,6 +15,7 @@ import {OfflineProvider,useOffline} from './offline';
 import {LocaleProvider,LanguageSwitcher,useI18n} from './locale';
 import {resolvePhrase,searchEntry,uniqueGestures} from '@/lib/gesture-search';
 import {capitalize,loadGestures} from '@/lib/catalog';
+import {planSigns} from '@/lib/translate';
 
 const RouteLoading=()=> <div className="route-loading" role="status" aria-label="Бөлім жүктелуде"/>;
 const Upload=dynamic(()=>import('./uploads').then(module=>module.Upload),{loading:RouteLoading});
@@ -22,6 +23,7 @@ const Materials=dynamic(()=>import('./materials').then(module=>module.Materials)
 const Material=dynamic(()=>import('./materials').then(module=>module.Material),{loading:RouteLoading});
 const Training=dynamic(()=>import('./materials').then(module=>module.Training),{loading:RouteLoading});
 const Camera=dynamic(()=>import('./camera').then(module=>module.Camera),{loading:RouteLoading});
+const Listen=dynamic(()=>import('./listen').then(module=>module.Listen),{loading:RouteLoading});
 
 export function Workspace(){return <LocaleProvider><WorkspaceContent/></LocaleProvider>;}
 function WorkspaceContent(){const {t}=useI18n();return <Suspense fallback={<p>{t("Открываем DosYm…")}</p>}><AuthProvider><OfflineProvider><Shell/></OfflineProvider></AuthProvider></Suspense>;}
@@ -29,9 +31,10 @@ function Shell(){const {t}=useI18n();
  const path=usePathname(),{user,loading}=useAuth();
  const [online,setOnline]=useState(true);
  useEffect(()=>{setOnline(navigator.onLine);const fn=()=>setOnline(navigator.onLine);window.addEventListener('online',fn);window.addEventListener('offline',fn);return()=>{window.removeEventListener('online',fn);window.removeEventListener('offline',fn);};},[]);
- const navigation=[['/','translate',t("Перевод")],['/camera','camera',t('Камера')],['/dictionary','book',t("Словарь")],['/upload','add',t("Добавить видео")],['/my','folder',t("Мои материалы")]];
+ const navigation=[['/','translate',t("Перевод")],['/listen','mic',t('Слушать')],['/camera','camera',t('Камера')],['/dictionary','book',t("Словарь")],['/upload','add',t("Добавить видео")],['/my','folder',t("Мои материалы")]];
  let content:React.ReactNode;
  if(path==='/')content=<Translate/>;
+ else if(path==='/listen')content=<Listen/>;
  else if(path==='/camera')content=<Camera/>;
  else if(path==='/dictionary')content=<Dictionary/>;
  else if(path.startsWith('/gestures/'))content=<GestureDetail id={path.split('/')[2]}/>;
@@ -88,11 +91,8 @@ function Translate(){const {t,errorText}=useI18n();
  useEffect(()=>{if(demoShown.current||!gestures.length||text||motions.length||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;const hello=gestures.find(g=>/^(сәлем|салем|привет)$/i.test(g.label.trim()))||gestures.find(g=>g.label.trim().length>2);if(!hello)return;demoShown.current=true;api<Motion>(`gestures/${hello.id}/motion`).then(m=>setMotions(current=>current.length?current:[m])).catch(()=>{});},[gestures]);
  const {saved}=useOffline();
  useEffect(()=>{loadGestures().then(rows=>setGestures(uniqueGestures(rows))).catch(()=>setGestures(uniqueGestures(saved.map(m=>({id:m.id,label:m.label,language:'kk-KZ',metadata:m.metadata})))));},[saved]);
- // Words without a sign are spelled with the letter signs, so a whole sentence always plays.
- const letterSigns=new Map<string,Gesture>(gestures.filter(g=>Array.from(g.label.trim()).length===1).map(g=>[g.label.trim().toLowerCase(),g]));
- const spellOut=(word:string)=>Array.from(word.toLowerCase()).map(ch=>letterSigns.get(ch)||(ch==='ё'?letterSigns.get('е'):undefined)).filter((g):g is Gesture=>Boolean(g));
  const [spelled,setSpelled]=useState<string[]>([]);
- async function show(value=text,selected?:Gesture){setBusy(true);setError('');setMissing([]);setSpelled([]);setAmbiguous([]);setMotions([]);try{const resolved=selected?{matches:[selected],missing:[],ambiguous:[],order:[{entry:selected}]}:resolvePhrase(value,gestures);setAmbiguous(resolved.ambiguous);const sequence:Gesture[]=[],spelledWords:string[]=[],lost:string[]=[];for(const item of resolved.order){if(item.entry)sequence.push(item.entry);else if(item.word){const letters=spellOut(item.word);if(letters.length){sequence.push(...letters);spelledWords.push(item.word);}else lost.push(item.word);}}setMissing(lost);setSpelled(spelledWords);const candidates=resolved.ambiguous.length?[]:sequence;const found=await Promise.all(candidates.map(g=>api<Motion>(`gestures/${g.id}/motion`).catch(()=>{const stored=saved.find(m=>m.id===g.id);if(!stored)throw new Error('Жест недоступен без сети.');return stored;})));setMotions(found);if(found.length&&window.matchMedia('(max-width: 950px)').matches)requestAnimationFrame(()=>document.querySelector('.player')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}));}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ async function show(value=text,selected?:Gesture){setBusy(true);setError('');setMissing([]);setSpelled([]);setAmbiguous([]);setMotions([]);try{const plan=planSigns(value,gestures,selected);setAmbiguous(plan.ambiguous);setMissing(plan.lost);setSpelled(plan.spelled);const candidates=plan.ambiguous.length?[]:plan.sequence;const found=await Promise.all(candidates.map(g=>api<Motion>(`gestures/${g.id}/motion`).catch(()=>{const stored=saved.find(m=>m.id===g.id);if(!stored)throw new Error('Жест недоступен без сети.');return stored;})));setMotions(found);if(found.length&&window.matchMedia('(max-width: 950px)').matches)requestAnimationFrame(()=>document.querySelector('.player')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}));}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  // Typing hints: words from the library that match what is being typed (Kazakh, Cyrillic or Latin spelling).
  const lastToken=(text.match(/\S+$/u)||[''])[0];
  const hints=lastToken&&!/\s$/u.test(text)?gestures.filter(g=>g.label.trim().toLowerCase()!==lastToken.toLowerCase()&&searchEntry(g,lastToken)).slice(0,5):[];
